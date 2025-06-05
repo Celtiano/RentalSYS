@@ -1,0 +1,197 @@
+{# myapp/templates/ver_contrato.html #}
+{% extends 'base.html' %}
+
+{% block title %}Ver Contrato - RentalSys{% endblock %}
+{% block header_title %}Detalles del Contrato: {{ contract.numero_contrato }}{% endblock %}
+
+{% block content %}
+<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 md:p-8 max-w-4xl mx-auto">
+  <div class="flex justify-between items-center mb-6 pb-4 border-b dark:border-gray-700">
+    <h2 class="text-2xl font-semibold text-gray-800 dark:text-gray-100">Contrato: {{ contract.numero_contrato }}</h2>
+    <a href="{{ url_for('contratos_bp.listar_contratos') }}" class="text-blue-600 hover:text-blue-700 dark:text-blue-400 text-sm">
+      <i class="fas fa-arrow-left mr-1"></i> Volver a Contratos
+    </a>
+  </div>
+
+  <!-- Datos básicos del contrato -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 mb-6">
+    <div><p class="text-sm font-medium text-gray-500 dark:text-gray-400">Número de Contrato</p><p class="text-gray-800 dark:text-gray-100 font-semibold">{{ contract.numero_contrato }}</p></div>
+    <div><p class="text-sm font-medium text-gray-500 dark:text-gray-400">Tipo</p><p class="text-gray-800 dark:text-gray-100 font-semibold">{{ contract.tipo or 'N/A' }}</p></div>
+    <div>
+      <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Propiedad</p>
+      <p class="text-gray-800 dark:text-gray-100 font-semibold">
+        {% if contract.propiedad_ref %}
+          {{ contract.propiedad_ref.direccion }}
+          <span class="text-xs text-gray-400">({{ contract.propiedad_ref.ciudad or 'S/C' }})</span>
+        {% else %} N/A {% endif %}
+      </p>
+    </div>
+    <div>
+      <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Inquilino</p>
+      <p class="text-gray-800 dark:text-gray-100 font-semibold">
+        {% if contract.inquilino_ref %} {{ contract.inquilino_ref.nombre }} {% else %} N/A {% endif %}
+      </p>
+    </div>
+    <div><p class="text-sm font-medium text-gray-500 dark:text-gray-400">Fecha Inicio</p><p class="text-gray-800 dark:text-gray-100 font-semibold">{{ contract.fecha_inicio | date }}</p></div>
+    <div><p class="text-sm font-medium text-gray-500 dark:text-gray-400">Fecha Fin</p><p class="text-gray-800 dark:text-gray-100 font-semibold">{{ contract.fecha_fin | date if contract.fecha_fin else 'Indefinido' }}</p></div>
+    <div><p class="text-sm font-medium text-gray-500 dark:text-gray-400">Precio Mensual Actual</p><p class="text-lg text-green-600 dark:text-green-400 font-bold">{{ contract.precio_mensual | currency }}</p></div>
+    <div><p class="text-sm font-medium text-gray-500 dark:text-gray-400">Fianza</p><p class="text-gray-800 dark:text-gray-100 font-semibold">{{ contract.deposito | currency }}</p></div>
+    <div><p class="text-sm font-medium text-gray-500 dark:text-gray-400">Estado</p><p class="text-gray-800 dark:text-gray-100 font-semibold capitalize">{{ contract.estado }}</p></div>
+    <div><p class="text-sm font-medium text-gray-500 dark:text-gray-400">Día de Facturación</p><p class="text-gray-800 dark:text-gray-100 font-semibold">{{ contract.dia_pago or 'N/A' }}</p></div>
+    <div>
+        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Tipo Actualización Renta</p>
+        <p class="text-gray-800 dark:text-gray-100 font-semibold">
+            {{ contract.tipo_actualizacion_renta | capitalize if contract.tipo_actualizacion_renta else 'No especificado' }}
+        </p>
+    </div>
+    {% if contract.tipo_actualizacion_renta in ['indice', 'indice_mas_fijo'] %}
+    <div>
+        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Índice Aplicable</p>
+        <p class="text-gray-800 dark:text-gray-100 font-semibold">
+            {% if contract.actualiza_ipc %}IPC{% elif contract.actualiza_irav %}IRAV{% else %}No especificado{% endif %}
+            (Ref: {{ contract.ipc_mes_inicio }}/{{ contract.ipc_ano_inicio }})
+        </p>
+    </div>
+    {% endif %}
+    {% if contract.tipo_actualizacion_renta in ['fijo', 'indice_mas_fijo'] and contract.importe_actualizacion_fija %}
+    <div>
+        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Importe Actualización Fija</p>
+        <p class="text-gray-800 dark:text-gray-100 font-semibold">{{ contract.importe_actualizacion_fija | currency }}</p>
+    </div>
+    {% endif %}
+    <div>
+        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Aplicar Índice Retroactivo</p>
+        <p class="text-gray-800 dark:text-gray-100 font-semibold">{{ "Sí" if contract.aplicar_indice_retroactivo else "No" }}</p>
+    </div>
+    <div>
+        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Aplicar IVA</p>
+        <p class="text-gray-800 dark:text-gray-100 font-semibold">{{ "Sí" if contract.aplicar_iva else "No" }}</p>
+    </div>
+    <div>
+        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Aplicar IRPF</p>
+        <p class="text-gray-800 dark:text-gray-100 font-semibold">{{ "Sí" if contract.aplicar_irpf else "No" }}</p>
+    </div>
+    {% if contract.serie_facturacion_prefijo %}
+    <div>
+        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Serie Facturación</p>
+        <p class="text-gray-800 dark:text-gray-100 font-semibold">
+            Prefijo: {{ contract.serie_facturacion_prefijo }},
+            Último Nº: {{ contract.serie_facturacion_ultimo_numero if contract.serie_facturacion_ultimo_numero is not none else 'N/A' }},
+            Año Serie: {{ contract.serie_facturacion_ano_actual or 'N/A' }},
+            Dígitos: {{ contract.serie_facturacion_formato_digitos or 'N/A' }}
+        </p>
+    </div>
+    {% endif %}
+  </div>
+
+  {% if contract.notas %}
+  <div class="mt-6 pt-4 border-t dark:border-gray-700">
+    <h3 class="text-md font-semibold text-gray-700 dark:text-gray-200 mb-2">Notas del Contrato</h3>
+    <p class="text-sm text-gray-600 dark:text-gray-300 whitespace-pre-wrap">{{ contract.notas }}</p>
+  </div>
+  {% endif %}
+
+  {% if contract.documentos %}
+  <div class="mt-6 pt-4 border-t dark:border-gray-700">
+    <h3 class="text-md font-semibold text-gray-700 dark:text-gray-200 mb-2">Documentos Adjuntos</h3>
+    <ul class="list-disc list-inside space-y-1">
+      {% for doc in contract.documentos %}
+      <li class="text-sm">
+        <a href="{{ url_for('contratos_bp.serve_contract_upload', filename=doc.filename) }}"
+           class="text-blue-600 hover:text-blue-700 dark:text-blue-400 hover:underline" target="_blank">
+          <i class="fas fa-paperclip mr-1 text-xs"></i>{{ doc.original_filename }}
+        </a>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  <!-- HISTORIAL DE ACTUALIZACIONES DE RENTA -->
+  <div class="mt-8 pt-6 border-t dark:border-gray-700">
+    <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-200 mb-4">Historial de Actualizaciones de Renta</h3>
+    {% if historial_actualizaciones %} {# Usar la variable pasada desde la ruta #}
+      <div class="overflow-x-auto rounded-lg border dark:border-gray-600">
+        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+          <thead class="bg-gray-50 dark:bg-gray-700">
+            <tr>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Fecha</th>
+              <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Renta Anterior</th>
+              <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Renta Nueva</th>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Tipo</th>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Detalle</th>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Factura Origen</th>
+            </tr>
+          </thead>
+          <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+            {% for h in historial_actualizaciones %}
+            <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+              <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{{ h.fecha_actualizacion | date }}</td>
+              <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300 text-right">{{ h.renta_anterior | currency }}</td>
+              <td class="px-4 py-2 whitespace-nowrap text-sm font-semibold text-gray-800 dark:text-gray-100 text-right">{{ h.renta_nueva | currency }}</td>
+              <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{{ h.tipo_actualizacion | replace('_', ' ') | capitalize if h.tipo_actualizacion else 'N/A' }}</td>
+              <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
+                {% if h.indice_nombre %}
+                  {{ h.indice_nombre }}: {{ h.indice_mes }}/{{ h.indice_ano }} ({{ h.indice_porcentaje | round(2) if h.indice_porcentaje is not none else '-' }}%)
+                {% endif %}
+                {% if h.importe_fijo_aplicado %}
+                  {% if h.indice_nombre %}<br>{% endif %}
+                  Importe Fijo: {{ h.importe_fijo_aplicado | currency }}
+                {% endif %}
+                {% if h.descripcion_adicional %}
+                    <span class="block text-xs italic text-gray-500">{{ h.descripcion_adicional }}</span>
+                {% endif %}
+              </td>
+              <td class="px-4 py-2 whitespace-nowrap text-sm">
+                {% if h.factura %}
+                  <a href="{{ url_for('facturas_bp.ver_factura', id=h.factura.id) }}" 
+                     class="text-blue-600 hover:underline dark:text-blue-400"
+                     title="Ver Factura {{h.factura.numero_factura}}">
+                     {{ h.factura.numero_factura_mostrado_al_cliente }}
+                  </a>
+                {% else %}
+                  <span class="italic text-gray-400 dark:text-gray-500">Manual / Sistema</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="text-sm text-gray-500 dark:text-gray-400 italic">No hay historial de actualizaciones de renta para este contrato.</p>
+    {% endif %}
+  </div>
+  <!-- ====== FIN HISTORIAL ====== -->
+
+  <div class="mt-8 pt-6 border-t dark:border-gray-700 flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-3">
+    <button onclick="history.back()" 
+            class="bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 px-5 py-2.5 rounded-lg text-sm font-medium flex items-center justify-center transition-colors">
+      <i class="fas fa-arrow-left mr-2"></i>Volver
+    </button>
+    {% if current_user.is_authenticated and current_user.role in ['admin', 'gestor'] %}
+    <button onclick="goToEditContract()" 
+            class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-medium flex items-center justify-center transition-colors">
+      <i class="fas fa-edit mr-2"></i>Editar Contrato
+    </button>
+    {% endif %}
+  </div>
+</div>
+
+{# Script para disparar el modal de edición (necesita que contratos.html y sus funciones estén disponibles globalmente o refactorizar) #}
+{# Para una solución autocontenida aquí, se podría copiar la función editContract de contratos.html, #}
+{# pero es mejor refactorizar si se va a usar en múltiples sitios. #}
+<script>
+	function goToEditContract() {
+		const contractId = "{{ contract.id }}";
+		// Redirigir a la lista de contratos con parámetro para editar
+		window.location.href = "{{ url_for('contratos_bp.listar_contratos') }}?edit=" + contractId;
+	}
+
+	// Esta función ya no se usa, pero la mantengo por si acaso algún otro lugar la llama
+	function triggerEditFromViewPage() {
+		goToEditContract();
+	}
+	
+</script>
+{% endblock %}

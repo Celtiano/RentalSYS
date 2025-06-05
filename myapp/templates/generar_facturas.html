@@ -1,0 +1,173 @@
+{% extends 'base.html' %}
+
+{% block title %}Generar Facturas - RentalSys{% endblock %}
+{% block header_title %}Generar Facturas Mensuales{% endblock %}
+
+{% block content %}
+<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 max-w-2xl mx-auto">
+    <h2 class="text-xl font-semibold text-gray-800 dark:text-gray-100 mb-6 text-center">Generación Automática de Facturas</h2>
+
+    <p class="text-sm text-gray-600 dark:text-gray-400 mb-4 text-center">
+        Selecciona el mes y el año para generar las facturas de los contratos activos correspondientes.
+        {% if current_user.is_authenticated and current_user.role != 'admin' %}
+            <br><strong>Nota:</strong> Solo se generarán facturas para los propietarios que tienes asignados.
+        {% endif %}
+    </p>
+    <p class="text-xs text-gray-500 dark:text-gray-500 mb-6 text-center">
+        Se aplicará la actualización de IPC si procede. No se generarán facturas duplicadas. Los gastos pendientes se integrarán.
+    </p>
+
+    {# --- DIV PARA MOSTRAR RESULTADOS/ERRORES --- #}
+    <div id="generationResult" class="mb-4 space-y-2">
+        <!-- Mensajes AJAX aquí -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    {% set cat_map={'danger':'red','success':'green','warning':'yellow','info':'blue'} %}
+                    {% set c=cat_map.get(category, 'blue') %}
+                    <div class="bg-{{c}}-100 dark:bg-{{c}}-900/40 border-l-4 border-{{c}}-500 text-{{c}}-700 dark:text-{{c}}-300 p-3 rounded-md" role="alert">
+                        <div class="flex"><div class="py-1"><i class="fas {{ 'fa-check-circle' if category == 'success' else 'fa-info-circle' if category == 'info' else 'fa-exclamation-triangle' if category == 'warning' else 'fa-times-circle' }} mr-2"></i></div><div><p class="font-bold capitalize">{{ category if category != 'message' else 'Información' }}</p><p class="text-sm">{{ message|safe }}</p></div></div>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    {# --- FORMULARIO CON ID Y CSRF_FORM --- #}
+    <form id="generateInvoicesForm" action="{{ url_for('facturas_bp.generar_facturas_mes') }}" method="POST" class="border-t dark:border-gray-700 pt-6">
+        {{ csrf_form.csrf_token }} {# <-- USANDO EL TOKEN DEL FORMULARIO PASADO DESDE LA VISTA #}
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
+            {# Selectores Mes y Año #}
+            <div>
+                <label for="month" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Mes de Facturación <span class="text-red-500">*</span></label>
+                <select id="month" name="month" required class="form-input w-full dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200">
+                    {% set current_month = default_month if default_month else (now().month if now else 1) %}
+                    {% for i in range(1, 13) %}
+                        <option value="{{ i }}" {% if i == current_month %}selected{% endif %}>
+                             {{ ["", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"][i] }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+             <div>
+                <label for="year" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Año de Facturación <span class="text-red-500">*</span></label>
+                 <select id="year" name="year" required class="form-input w-full dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200">
+                     {% set current_year = default_year if default_year else (now().year if now else 2024) %}
+                     {% set years_to_show = years_list if years_list else range(current_year + 1 , current_year - 5, -1) %}
+                     {% for year_option in years_to_show %}
+                        <option value="{{ year_option }}" {% if year_option == current_year %}selected{% endif %}>{{ year_option }}</option>
+                     {% endfor %}
+                 </select>
+             </div>
+        </div>
+
+        {# Checkbox envío #}
+        <div class="mb-6 flex items-center justify-center">
+             <input type="checkbox" id="send_emails_auto" name="send_emails_auto" value="on" class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+             <label for="send_emails_auto" class="ml-2 block text-sm text-gray-700 dark:text-gray-300">
+                 Enviar emails automáticamente tras generar (a inquilinos con email, CCO a propietario)
+             </label>
+        </div>
+
+        <div class="flex justify-center">
+            {# Botón con ID #}
+            <button id="generateButton" type="submit" class="bg-green-600 hover:bg-green-700 text-white px-8 py-2.5 rounded-md flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 dark:focus:ring-offset-gray-800 disabled:opacity-50 disabled:cursor-wait">
+                <i id="generateButtonIcon" class="fas fa-cogs mr-2"></i>
+                <span id="generateButtonText">Generar Facturas para este Periodo</span>
+            </button>
+        </div>
+    </form>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+{# --- SCRIPT AJAX (Ahora debería funcionar correctamente con CSRF en FormData) --- #}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('generateInvoicesForm');
+    const button = document.getElementById('generateButton');
+    const buttonIcon = document.getElementById('generateButtonIcon');
+    const buttonText = document.getElementById('generateButtonText');
+    const resultDiv = document.getElementById('generationResult');
+    const originalButtonText = buttonText ? buttonText.textContent : 'Generar Facturas';
+    const originalButtonIconClass = buttonIcon ? buttonIcon.className : 'fas fa-cogs mr-2';
+    const csrfTokenInput = form ? form.querySelector('input[name="csrf_token"]') : null; // Buscar el input renderizado
+
+    if (!csrfTokenInput || !csrfTokenInput.value) { // Comprobar si existe y tiene valor
+        console.error("¡Error crítico! No se encontró el token CSRF renderizado en el formulario 'generateInvoicesForm'.");
+        if(button) button.disabled = true;
+        if(resultDiv) resultDiv.innerHTML = '<div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded-md" role="alert"><p><strong>Error de Configuración:</strong> Falta el token de seguridad CSRF. No se puede generar facturas.</p></div>';
+    } else if (form && button && buttonIcon && buttonText && resultDiv) {
+        // Si todo está OK, añadir el listener
+        form.addEventListener('submit', function(event) {
+            event.preventDefault();
+
+            button.disabled = true;
+            buttonIcon.className = 'fas fa-spinner fa-spin mr-2';
+            buttonText.textContent = 'Procesando...';
+            resultDiv.innerHTML = '<div class="text-center text-gray-600 dark:text-gray-400"><i class="fas fa-spinner fa-spin mr-2"></i>Generando facturas y enviando emails (si aplica)...</div>';
+
+            const formData = new FormData(form); // Recoge TODOS los inputs del form, incluyendo csrf_token
+            const actionUrl = form.action;
+
+            fetch(actionUrl, {
+                method: 'POST',
+                body: formData,
+                headers: { 'Accept': 'application/json' }
+            })
+            .then(response => { /* ... (Manejo de respuesta AJAX idéntico a la versión anterior) ... */
+                const contentType = response.headers.get("content-type");
+                if (contentType && contentType.indexOf("application/json") !== -1) {
+                    return response.json().then(data => ({ ok: response.ok, status: response.status, data }));
+                } else {
+                    return response.text().then(text => {
+                        console.error('Respuesta no JSON:', text);
+                        if (text.toLowerCase().includes('csrf token missing')) {
+                             throw new Error('Error 400: Falta el token CSRF en la solicitud.');
+                        } else if (text.toLowerCase().includes('bad request')) {
+                             // Mostrar el texto del error si es un Bad Request genérico
+                             throw new Error(`Error 400: Bad Request - ${text.substring(0, 100)}...`);
+                        }
+                        throw new Error(`Error ${response.status}: Respuesta inesperada del servidor.`);
+                    });
+                }
+            })
+            .then(({ ok, status, data }) => { /* ... (Manejo de JSON idéntico) ... */
+                resultDiv.innerHTML = '';
+                if (data && data.messages && Array.isArray(data.messages)) {
+                    data.messages.forEach(msgObj => {
+                        const category = msgObj.category || 'info';
+                        const message = msgObj.message || 'Mensaje no especificado.';
+                        const catMap = {'danger':'red','success':'green','warning':'yellow','info':'blue'};
+                        const color = catMap[category] || 'blue';
+                        const iconMap = {'danger':'fa-times-circle','success':'fa-check-circle','warning':'fa-exclamation-triangle','info':'fa-info-circle'};
+                        const icon = iconMap[category] || 'fa-info-circle';
+                        const alertDiv = document.createElement('div');
+                        alertDiv.className = `bg-${color}-100 dark:bg-${color}-900/40 border-l-4 border-${color}-500 text-${color}-700 dark:text-${color}-300 p-3 rounded-md mb-2`;
+                        alertDiv.setAttribute('role', 'alert');
+                        alertDiv.innerHTML = `<div class="flex"><div class="py-1"><i class="fas ${icon} mr-2"></i></div><div><p class="font-bold capitalize">${category === 'message' ? 'Información' : category}</p><p class="text-sm">${message}</p></div></div>`;
+                        resultDiv.appendChild(alertDiv);
+                    });
+                } else if (!ok) {
+                    throw new Error(`Error ${status}: ${data.error || 'Error desconocido del servidor'}`);
+                } else {
+                     resultDiv.innerHTML = '<div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-3 rounded-md" role="alert"><p>Proceso completado, pero no se recibieron mensajes de estado.</p></div>';
+                }
+            })
+            .catch(error => {
+                console.error('Error en la solicitud fetch:', error);
+                resultDiv.innerHTML = `<div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded-md" role="alert"><p><strong>Error:</strong> ${error.message || 'No se pudo completar la solicitud.'}</p></div>`;
+            })
+            .finally(() => {
+                button.disabled = false;
+                buttonIcon.className = originalButtonIconClass;
+                buttonText.textContent = originalButtonText;
+            });
+        });
+    } else {
+        console.error("Error inicializando script AJAX generar facturas: Elementos clave no encontrados o falta token CSRF.");
+    }
+});
+</script>
+{% endblock %}

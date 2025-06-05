@@ -1,0 +1,747 @@
+{% extends 'base.html' %}
+
+{% block title %}Gestión de Índices - RentalSys{% endblock %}
+{% block header_title %}Gestión de Índices{% endblock %}
+
+{% block content %}
+
+<!-- Header de Sección con estilo consistente -->
+<div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+    <h2 class="text-2xl font-semibold text-gray-800 dark:text-gray-100 mb-4 md:mb-0">📊 Gestión de Índices (IPC/IRAV)</h2>
+    <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+        <button onclick="showCreateIndexModal('ipc')" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md flex items-center focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+            <i class="fas fa-plus mr-2"></i> Nuevo IPC
+        </button>
+        <button onclick="showCreateIndexModal('irav')" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md flex items-center focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors">
+            <i class="fas fa-plus mr-2"></i> Nuevo IRAV
+        </button>
+    </div>
+</div>
+
+<!-- Tarjetas de Métricas Superiores -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    <!-- Tarjeta Último IPC -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+        <div class="p-6">
+            <div class="flex items-center justify-between">
+                <div class="flex-1">
+                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Último IPC Registrado</p>
+                    {% if latest_ipc %}
+                        <h3 class="text-2xl font-bold mt-2 {{ 'text-green-600 dark:text-green-400' if latest_ipc.percentage_change >= 0 else 'text-red-600 dark:text-red-400' }}">
+                            {{ '%+.2f' | format(latest_ipc.percentage_change|float) | replace('.', ',') }}%
+                        </h3>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ meses[latest_ipc.month] }} {{ latest_ipc.year }}</p>
+                    {% else %}
+                        <h3 class="text-2xl font-bold text-gray-400 dark:text-gray-500 mt-2">N/A</h3>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Sin datos</p>
+                    {% endif %}
+                </div>
+                <div class="flex-shrink-0 h-12 w-12 rounded-full {{ 'bg-green-100 dark:bg-green-900/50' if latest_ipc and latest_ipc.percentage_change >= 0 else 'bg-red-100 dark:bg-red-900/50' if latest_ipc else 'bg-gray-100 dark:bg-gray-700' }} flex items-center justify-center">
+                    <i class="fas {{ 'fa-arrow-trend-up text-green-600 dark:text-green-400' if latest_ipc and latest_ipc.percentage_change >= 0 else 'fa-arrow-trend-down text-red-600 dark:text-red-400' if latest_ipc else 'fa-chart-line text-gray-500 dark:text-gray-400' }}"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tarjeta Promedio IPC -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+        <div class="p-6">
+            <div class="flex items-center justify-between">
+                <div class="flex-1">
+                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Promedio IPC {{ default_year }}</p>
+                    {% if current_year_avg_ipc is not none %}
+                        <h3 class="text-2xl font-bold mt-2 {{ 'text-green-600 dark:text-green-400' if current_year_avg_ipc >= 0 else 'text-red-600 dark:text-red-400' }}">
+                            {{ '%+.2f' | format(current_year_avg_ipc) | replace('.', ',') }}%
+                        </h3>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Media anual</p>
+                    {% else %}
+                        <h3 class="text-2xl font-bold text-gray-400 dark:text-gray-500 mt-2">N/A</h3>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Sin datos {{ default_year }}</p>
+                    {% endif %}
+                </div>
+                <div class="flex-shrink-0 h-12 w-12 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center">
+                    <i class="fas fa-calculator text-blue-600 dark:text-blue-400"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tarjeta Último IRAV -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+        <div class="p-6">
+            <div class="flex items-center justify-between">
+                <div class="flex-1">
+                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Último IRAV Registrado</p>
+                    {% if latest_irav %}
+                        <h3 class="text-2xl font-bold mt-2 {{ 'text-green-600 dark:text-green-400' if latest_irav.percentage_change >= 0 else 'text-red-600 dark:text-red-400' }}">
+                            {{ '%+.2f' | format(latest_irav.percentage_change|float) | replace('.', ',') }}%
+                        </h3>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ meses[latest_irav.month] }} {{ latest_irav.year }}</p>
+                    {% else %}
+                        <h3 class="text-2xl font-bold text-gray-400 dark:text-gray-500 mt-2">N/A</h3>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Sin datos</p>
+                    {% endif %}
+                </div>
+                <div class="flex-shrink-0 h-12 w-12 rounded-full {{ 'bg-green-100 dark:bg-green-900/50' if latest_irav and latest_irav.percentage_change >= 0 else 'bg-red-100 dark:bg-red-900/50' if latest_irav else 'bg-gray-100 dark:bg-gray-700' }} flex items-center justify-center">
+                    <i class="fas {{ 'fa-home text-green-600 dark:text-green-400' if latest_irav and latest_irav.percentage_change >= 0 else 'fa-home text-red-600 dark:text-red-400' if latest_irav else 'fa-home text-gray-500 dark:text-gray-400' }}"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tarjeta Promedio IRAV -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+        <div class="p-6">
+            <div class="flex items-center justify-between">
+                <div class="flex-1">
+                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Promedio IRAV {{ default_year }}</p>
+                    {% if current_year_avg_irav is not none %}
+                        <h3 class="text-2xl font-bold mt-2 {{ 'text-green-600 dark:text-green-400' if current_year_avg_irav >= 0 else 'text-red-600 dark:text-red-400' }}">
+                            {{ '%+.2f' | format(current_year_avg_irav) | replace('.', ',') }}%
+                        </h3>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Media anual</p>
+                    {% else %}
+                        <h3 class="text-2xl font-bold text-gray-400 dark:text-gray-500 mt-2">N/A</h3>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Sin datos {{ default_year }}</p>
+                    {% endif %}
+                </div>
+                <div class="flex-shrink-0 h-12 w-12 rounded-full bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center">
+                    <i class="fas fa-chart-pie text-indigo-600 dark:text-indigo-400"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tarjeta de Búsqueda y Añadir Índice -->
+<div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden mb-8">
+    <!-- Header de la tarjeta -->
+    <div class="bg-gradient-to-r from-orange-600 to-red-600 px-6 py-4">
+        <h3 class="text-xl font-semibold text-white flex items-center">
+            <i class="fas fa-search-plus mr-3"></i>
+            Búsqueda y Registro de Índices INE
+        </h3>
+    </div>
+
+    <!-- Contenido de la tarjeta -->
+    <div class="p-6">
+        <div class="grid grid-cols-1 sm:grid-cols-6 gap-4 items-end">
+            <!-- Selector de Índice -->
+            <div class="relative">
+                <label for="indexTypeSelect" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Índice</label>
+                <select id="indexTypeSelect" name="indexType_display" required class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all">
+                    <option value="ipc" selected>IPC</option>
+                    <option value="irav">IRAV</option>
+                </select>
+                <i class="fas fa-chart-line absolute left-2.5 top-9 text-gray-400 text-sm"></i>
+            </div>
+
+            <!-- Año -->
+            <div class="relative">
+                <label for="indexYearQuickAdd" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Año</label>
+                <input type="number" id="indexYearQuickAdd" name="indexYearQuick_display" required class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all" min="1950" max="{{ now().year + 1 }}" step="1" value="{{ default_year }}">
+                <i class="fas fa-calendar-alt absolute left-2.5 top-9 text-gray-400 text-sm"></i>
+            </div>
+
+            <!-- Mes -->
+            <div class="relative">
+                <label for="indexMonthQuickAdd" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Mes</label>
+                <select id="indexMonthQuickAdd" name="indexMonthQuick_display" required class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all">
+                    {% for i in range(1, 13) %}
+                    <option value="{{ i }}" {% if i == default_month %}selected{% endif %}>{{ meses[i] }}</option>
+                    {% endfor %}
+                </select>
+                <i class="fas fa-calendar absolute left-2.5 top-9 text-gray-400 text-sm"></i>
+            </div>
+
+            <!-- Variación -->
+            <div class="relative">
+                <label for="indexPercentageQuickAdd" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Variación (%)</label>
+                <input type="text" id="indexPercentageQuickAdd" name="indexPercentageQuick_display" required
+                       class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
+                       placeholder="Buscar..." pattern="^-?\d+([.,]\d+([.,]\d+)?)?$" readonly
+                       title="Busca en INE para activar. Formato ej: 3.5 o -0.888">
+                <i class="fas fa-percentage absolute left-2.5 top-9 text-gray-400 text-sm"></i>
+            </div>
+
+            <!-- Botón Buscar INE -->
+            <div>
+                <button type="button" onclick="fetchSpecificIndexValue()" id="fetchIneButton"
+                        class="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white px-4 py-2 rounded-lg text-sm flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-orange-500 transition-all shadow hover:shadow-lg w-full h-[40px]"
+                        title="Buscar valor en INE">
+                    <i id="fetchIneIcon" class="fas fa-search mr-2"></i>
+                    <span class="hidden sm:inline">Buscar INE</span><span class="sm:hidden">Buscar</span>
+                </button>
+            </div>
+
+            <!-- Botón Añadir -->
+            <div>
+                <form action="" method="POST" id="quickAddForm" onsubmit="return prepareQuickAddData();">
+                    {{ csrf_form.csrf_token }}
+                    <input type="hidden" name="ipcYear" id="quickAddYearHidden">
+                    <input type="hidden" name="ipcMonth" id="quickAddMonthHidden">
+                    <input type="hidden" name="ipcPercentage" id="quickAddPercentageHidden">
+                    <button type="submit" id="quickAddButton" disabled
+                            class="bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800 px-4 py-2 rounded-lg text-sm flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow hover:shadow-lg w-full h-[40px] disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Añadir el valor encontrado">
+                        <i class="fas fa-plus mr-2"></i>
+                        <span class="hidden sm:inline">Añadir</span><span class="sm:hidden">OK</span>
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Estado de la búsqueda -->
+        <div id="quickAddStatus" class="text-sm mt-4 min-h-[1.5rem] transition-all duration-300"></div>
+    </div>
+</div>
+
+<!-- Sección Histórico IPC -->
+<div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden mb-8">
+    <!-- Header -->
+    <div class="bg-gray-50 dark:bg-gray-900/50 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 flex items-center">
+                <i class="fas fa-chart-line text-blue-600 dark:text-blue-400 mr-2"></i>
+                Histórico IPC
+            </h3>
+            <div class="flex flex-col sm:flex-row gap-2">
+                <div class="relative">
+                    <select id="ipcFilterYear" class="form-input pl-8 pr-10 py-2 text-sm" onchange="filterIndexData('ipc', this.value)">
+                        <option value="all" selected>Todos los años</option>
+                        {% for year in available_years_ipc %}<option value="{{ year }}">{{ year }}</option>{% endfor %}
+                    </select>
+                    <i class="fas fa-filter absolute left-2.5 top-2.5 text-gray-400 text-sm"></i>
+                </div>
+                <form action="{{ url_for('ipc_bp.update_ipc_from_ine_route') }}" method="POST" class="inline-block">
+                    {{ csrf_form.csrf_token }}
+                    <button type="submit" class="bg-teal-500 hover:bg-teal-600 text-white px-4 py-2 rounded-lg text-sm flex items-center">
+                        <i class="fas fa-sync-alt mr-2"></i>Actualizar INE
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contenido IPC -->
+    <div class="p-6">
+        <div id="ipcDataGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
+            {% if ipc_data %}
+                {% for item in ipc_data %}
+                <div class="ipc-item-card bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800 hover:shadow-lg transition-all duration-200" data-year="{{ item.year }}" data-month="{{ item.month }}" data-percentage="{{ item.percentage_change }}">
+                    <div class="text-center">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-xs font-semibold text-blue-600 dark:text-blue-400">{{ meses[item.month] }}</span>
+                            <span class="text-xs text-gray-500 dark:text-gray-400">{{ item.year }}</span>
+                        </div>
+                        <p class="text-xl font-bold {{ 'text-green-600 dark:text-green-400' if item.percentage_change >= 0 else 'text-red-600 dark:text-red-400' }} mb-3">
+                            {{ '%+.2f' | format(item.percentage_change|float) | replace('.', ',') }}%
+                        </p>
+                        <div class="flex justify-center space-x-2">
+                            <button onclick="editIndexEntry(this, 'ipc', {{ item.id }})" class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 text-xs p-1 rounded hover:bg-blue-100 dark:hover:bg-blue-900/50" title="Editar">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button onclick="deleteIndexEntry('ipc', {{ item.id }})" class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 text-xs p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/50" title="Eliminar">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="col-span-full text-center text-gray-500 dark:text-gray-400 py-8">
+                    <i class="fas fa-chart-line text-4xl mb-4 opacity-50"></i>
+                    <p class="text-lg font-medium">No hay datos IPC registrados</p>
+                    <p class="text-sm">Añade el primer registro usando la búsqueda INE</p>
+                </div>
+            {% endif %}
+            <div id="no-filtered-ipc-data" class="hidden col-span-full text-center text-gray-500 dark:text-gray-400 py-8">
+                <i class="fas fa-filter text-3xl mb-3 opacity-50"></i>
+                <p>No hay datos IPC para el año seleccionado</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Sección Histórico IRAV -->
+<div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden mb-8">
+    <!-- Header -->
+    <div class="bg-gray-50 dark:bg-gray-900/50 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 flex items-center">
+                <i class="fas fa-home text-indigo-600 dark:text-indigo-400 mr-2"></i>
+                Histórico IRAV
+            </h3>
+            <div class="flex flex-col sm:flex-row gap-2">
+                <div class="relative">
+                    <select id="iravFilterYear" class="form-input pl-8 pr-10 py-2 text-sm" onchange="filterIndexData('irav', this.value)">
+                        <option value="all" selected>Todos los años</option>
+                        {% for year in available_years_irav %}<option value="{{ year }}">{{ year }}</option>{% endfor %}
+                    </select>
+                    <i class="fas fa-filter absolute left-2.5 top-2.5 text-gray-400 text-sm"></i>
+                </div>
+                <form action="{{ url_for('ipc_bp.update_irav_from_ine_route') }}" method="POST" class="inline-block">
+                    {{ csrf_form.csrf_token }}
+                    <button type="submit" class="bg-teal-500 hover:bg-teal-600 text-white px-4 py-2 rounded-lg text-sm flex items-center">
+                        <i class="fas fa-sync-alt mr-2"></i>Actualizar INE
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contenido IRAV -->
+    <div class="p-6">
+        <div id="iravDataGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
+            {% if irav_data %}
+                {% for item in irav_data %}
+                <div class="irav-item-card bg-gradient-to-br from-indigo-50 to-indigo-100 dark:from-indigo-900/20 dark:to-indigo-800/20 rounded-lg p-4 border border-indigo-200 dark:border-indigo-800 hover:shadow-lg transition-all duration-200" data-year="{{ item.year }}" data-month="{{ item.month }}" data-percentage="{{ item.percentage_change }}">
+                    <div class="text-center">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-xs font-semibold text-indigo-600 dark:text-indigo-400">{{ meses[item.month] }}</span>
+                            <span class="text-xs text-gray-500 dark:text-gray-400">{{ item.year }}</span>
+                        </div>
+                        <p class="text-xl font-bold {{ 'text-green-600 dark:text-green-400' if item.percentage_change >= 0 else 'text-red-600 dark:text-red-400' }} mb-3">
+                            {{ '%+.2f' | format(item.percentage_change|float) | replace('.', ',') }}%
+                        </p>
+                        <div class="flex justify-center space-x-2">
+                            <button onclick="editIndexEntry(this, 'irav', {{ item.id }})" class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 text-xs p-1 rounded hover:bg-blue-100 dark:hover:bg-blue-900/50" title="Editar">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button onclick="deleteIndexEntry('irav', {{ item.id }})" class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 text-xs p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/50" title="Eliminar">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="col-span-full text-center text-gray-500 dark:text-gray-400 py-8">
+                    <i class="fas fa-home text-4xl mb-4 opacity-50"></i>
+                    <p class="text-lg font-medium">No hay datos IRAV registrados</p>
+                    <p class="text-sm">Añade el primer registro usando la búsqueda INE</p>
+                </div>
+            {% endif %}
+            <div id="no-filtered-irav-data" class="hidden col-span-full text-center text-gray-500 dark:text-gray-400 py-8">
+                <i class="fas fa-filter text-3xl mb-3 opacity-50"></i>
+                <p>No hay datos IRAV para el año seleccionado</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Crear/Editar Índice -->
+<div id="indexModal" class="fixed inset-0 overflow-y-auto hidden z-50" role="dialog" aria-labelledby="index-modal-title" aria-modal="true">
+    <div class="flex items-end justify-center min-h-screen px-4 pb-20 text-center sm:block sm:p-0">
+        <div class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm transition-opacity" aria-hidden="true"></div>
+        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">​</span>
+        
+        <div class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-xl overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg w-full modal-content">
+            <form id="indexModalForm" action="" method="POST" novalidate>
+                {{ csrf_form.csrf_token }}
+                <input type="hidden" id="indexModalEntryId" name="ipcId">
+                
+                <!-- Header del Modal -->
+                <div class="bg-gradient-to-r from-green-600 to-teal-600 px-6 py-4">
+                    <div class="flex items-center justify-between">
+                        <h3 id="indexModalTitle" class="text-xl font-semibold text-white flex items-center">
+                            <i class="fas fa-chart-line mr-3"></i>
+                            Añadir/Editar Valor
+                        </h3>
+                        <button type="button" onclick="closeModal('indexModal')" 
+                                class="text-white/80 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-white/50 rounded-lg p-1">
+                            <i class="fas fa-times text-xl"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Body del Modal -->
+                <div class="px-6 py-4 max-h-[calc(100vh-200px)] overflow-y-auto modal-body">
+                    <div class="space-y-4">
+                        <!-- Año -->
+                        <div class="relative">
+                            <label for="indexModalYear" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Año *</label>
+                            <input type="number" id="indexModalYear" name="ipcYear" required class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all" min="1950" max="{{ now().year + 1 }}" step="1">
+                            <i class="fas fa-calendar-alt absolute left-2.5 top-9 text-gray-400 text-sm"></i>
+                        </div>
+
+                        <!-- Mes -->
+                        <div class="relative">
+                            <label for="indexModalMonth" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Mes *</label>
+                            <select id="indexModalMonth" name="ipcMonth" required class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all">
+                                <option value="">Seleccionar mes...</option>
+                                {% for i in range(1, 13) %}
+                                <option value="{{ i }}">{{ meses[i] }}</option>
+                                {% endfor %}
+                            </select>
+                            <i class="fas fa-calendar absolute left-2.5 top-9 text-gray-400 text-sm"></i>
+                        </div>
+
+                        <!-- Variación -->
+                        <div class="relative">
+                            <label for="indexModalPercentage" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Variación (%) *</label>
+                            <input type="text" id="indexModalPercentage" name="ipcPercentage" required class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all" placeholder="Ej: 1.85 o -0.5" pattern="^-?\d+([.,]\d+([.,]\d+)?)?$" title="Número decimal, ej: 3.5 o -0.123">
+                            <i class="fas fa-percentage absolute left-2.5 top-9 text-gray-400 text-sm"></i>
+                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Usa punto o coma decimal</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Footer del Modal -->
+                <div class="bg-gray-50 dark:bg-gray-900/50 px-6 py-4 flex items-center justify-between border-t border-gray-200 dark:border-gray-700">
+                    <div class="text-xs text-gray-500 dark:text-gray-400 flex items-center">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        Los campos marcados con * son obligatorios
+                    </div>
+                    <div class="flex space-x-2">
+                        <button type="button" onclick="closeModal('indexModal')"
+                                class="px-4 py-2 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 font-medium text-sm transition-colors flex items-center">
+                            <i class="fas fa-times mr-2"></i>
+                            Cancelar
+                        </button>
+                        <button type="submit"
+                                class="px-4 py-2 rounded-lg bg-gradient-to-r from-green-600 to-teal-600 text-white hover:from-green-700 hover:to-teal-700 font-medium text-sm transition-all flex items-center shadow hover:shadow-lg">
+                            <i class="fas fa-save mr-2"></i>
+                            Guardar
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Confirmar Eliminación -->
+<div id="deleteIndexModal" class="fixed inset-0 overflow-y-auto hidden z-50">
+    <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm transition-opacity" aria-hidden="true"></div>
+        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">​</span>
+        
+        <div class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            <div class="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div class="sm:flex sm:items-start">
+                    <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 dark:bg-red-900/30 sm:mx-0 sm:h-10 sm:w-10">
+                        <i class="fas fa-exclamation-triangle text-red-600 dark:text-red-400"></i>
+                    </div>
+                    <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                        <h3 id="deleteIndexModalTitle" class="text-lg leading-6 font-medium text-gray-900 dark:text-white">Eliminar Índice</h3>
+                        <div class="mt-2">
+                            <p class="text-sm text-gray-500 dark:text-gray-400">
+                                ¿Estás seguro de que deseas eliminar <strong id="deleteIndexPeriod" class="text-gray-700 dark:text-gray-200"></strong>? Esta acción no se puede deshacer.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button id="confirmDeleteIndexButton" type="button" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm">
+                    <i class="fas fa-trash mr-2"></i>
+                    Eliminar
+                </button>
+                <button type="button" onclick="closeModal('deleteIndexModal')" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-800 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                    Cancelar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // --- Funciones Específicas para Índices ---
+    function showCreateIndexModal(indexType) {
+        const form = document.getElementById('indexModalForm');
+        const titleEl = document.getElementById('indexModalTitle');
+        const entryIdInput = document.getElementById('indexModalEntryId');
+
+        if (form) {
+            form.reset();
+            // Limpiar errores de validación previos
+            form.querySelectorAll('.text-red-500.text-xs.mt-1').forEach(el => el.textContent = '');
+            form.querySelectorAll('.border-red-500').forEach(el => el.classList.remove('border-red-500', 'dark:border-red-600'));
+        } else { 
+            console.error("Formulario indexModalForm no encontrado"); 
+            return; 
+        }
+
+        if (titleEl) titleEl.innerHTML = `<i class="fas fa-chart-line mr-3"></i>Añadir Valor ${indexType.toUpperCase()} Manualmente`;
+        if (entryIdInput) entryIdInput.value = '';
+
+        // Asignar action al formulario
+        form.action = (indexType === 'ipc') ? "{{ url_for('ipc_bp.add_ipc_manual_route') }}" : "{{ url_for('ipc_bp.add_irav_manual_route') }}";
+
+        // Valores por defecto
+        document.getElementById('indexModalYear').value = {{ default_year }};
+        document.getElementById('indexModalMonth').value = {{ default_month }};
+        document.getElementById('indexModalPercentage').value = '';
+
+        showModal('indexModal');
+    }
+
+    function editIndexEntry(btn, indexType, entryId) {
+        const card = btn.closest('.ipc-item-card, .irav-item-card');
+        if (!card) { 
+            console.error("Tarjeta del índice no encontrada"); 
+            return; 
+        }
+        
+        const data = card.dataset;
+        const form = document.getElementById('indexModalForm');
+        const titleEl = document.getElementById('indexModalTitle');
+        const entryIdInput = document.getElementById('indexModalEntryId');
+
+        if (!form || !titleEl || !entryIdInput) { 
+            console.error("Elementos del modal no encontrados"); 
+            return; 
+        }
+
+        titleEl.innerHTML = `<i class="fas fa-edit mr-3"></i>Editar Valor ${indexType.toUpperCase()}`;
+        entryIdInput.value = entryId;
+
+        // Poblar modal
+        document.getElementById('indexModalYear').value = data.year || '';
+        document.getElementById('indexModalMonth').value = data.month || '';
+        document.getElementById('indexModalPercentage').value = (data.percentage || '0').replace(',', '.');
+
+        // Asignar action al formulario
+        form.action = (indexType === 'ipc') ? `{{ url_for('ipc_bp.edit_ipc_route', id=0) }}`.replace('0', entryId)
+                                            : `{{ url_for('ipc_bp.edit_irav_route', id=0) }}`.replace('0', entryId);
+        
+        showModal('indexModal');
+    }
+
+    function deleteIndexEntry(indexType, entryId) {
+        // Buscar la tarjeta correspondiente
+        const card = document.querySelector(`.${indexType}-item-card[data-year][data-month]`);
+        let year = '?', monthName = '?';
+        
+        // Buscar todas las tarjetas para encontrar la correcta por ID
+        const allCards = document.querySelectorAll(`.${indexType}-item-card`);
+        for (let c of allCards) {
+            // Buscar botón de eliminar que coincida con el ID
+            const deleteBtn = c.querySelector(`button[onclick*="deleteIndexEntry('${indexType}', ${entryId})"]`);
+            if (deleteBtn) {
+                year = c.dataset.year || '?';
+                const monthIndex = parseInt(c.dataset.month) || 0;
+                const monthsArray = {{ meses | tojson | safe }};
+                monthName = (monthIndex >= 1 && monthIndex <= 12) ? monthsArray[monthIndex] : '?';
+                break;
+            }
+        }
+
+        const period = `${monthName}/${year}`;
+
+        document.getElementById('deleteIndexModalTitle').textContent = `Eliminar ${indexType.toUpperCase()}`;
+        document.getElementById('deleteIndexPeriod').textContent = period;
+
+        const confirmBtn = document.getElementById('confirmDeleteIndexButton');
+        const csrfToken = document.querySelector('#quickAddForm input[name="csrf_token"]')?.value || 
+                          document.querySelector('#indexModalForm input[name="csrf_token"]')?.value ||
+                          document.querySelector('meta[name="csrf-token"]')?.content || '';
+        
+        if (!csrfToken) { 
+            console.error("Token CSRF no encontrado!"); 
+            alert("Error de seguridad."); 
+            return; 
+        }
+
+        confirmBtn.onclick = () => {
+            const url = (indexType === 'ipc') ? `{{ url_for('ipc_bp.delete_ipc_route', id=0) }}`.replace('0', entryId)
+                                              : `{{ url_for('ipc_bp.delete_irav_route', id=0) }}`.replace('0', entryId);
+            
+            if (typeof confirmDeleteWithToken === 'function') {
+                confirmDeleteWithToken('deleteIndexModal', url, csrfToken);
+            } else {
+                console.error("Función global confirmDeleteWithToken no definida");
+                // Fallback
+                closeModal('deleteIndexModal');
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = url;
+                const csrfInput = document.createElement('input');
+                csrfInput.type = 'hidden';
+                csrfInput.name = 'csrf_token';
+                csrfInput.value = csrfToken;
+                form.appendChild(csrfInput);
+                document.body.appendChild(form);
+                form.submit();
+            }
+        };
+        
+        showModal('deleteIndexModal');
+    }
+
+    // Filtrado por año
+    function filterIndexData(indexType, selectedYear) {
+        const gridId = (indexType === 'ipc') ? 'ipcDataGrid' : 'iravDataGrid';
+        const cardClass = (indexType === 'ipc') ? '.ipc-item-card' : '.irav-item-card';
+        const noFilteredId = (indexType === 'ipc') ? 'no-filtered-ipc-data' : 'no-filtered-irav-data';
+
+        const cards = document.querySelectorAll(`#${gridId} ${cardClass}`);
+        let visibleCount = 0;
+        const totalItems = (indexType === 'ipc') ? {{ ipc_data|length }} : {{ irav_data|length }};
+
+        cards.forEach(card => {
+            const cardYear = card.dataset.year;
+            const show = selectedYear === 'all' || selectedYear === '' || cardYear === selectedYear;
+            card.style.display = show ? 'block' : 'none';
+            if (show) visibleCount++;
+        });
+
+        const noFilteredCard = document.getElementById(noFilteredId);
+        if(noFilteredCard) {
+            noFilteredCard.classList.toggle('hidden', !(totalItems > 0 && visibleCount === 0));
+        }
+    }
+
+    // Buscar valor de índice específico
+    async function fetchSpecificIndexValue() {
+        const indexType = document.getElementById('indexTypeSelect').value;
+        const yearInput = document.getElementById('indexYearQuickAdd');
+        const monthInput = document.getElementById('indexMonthQuickAdd');
+        const percentageInput = document.getElementById('indexPercentageQuickAdd');
+        const statusDiv = document.getElementById('quickAddStatus');
+        const addButton = document.getElementById('quickAddButton');
+        const fetchButton = document.getElementById('fetchIneButton');
+        const fetchIcon = document.getElementById('fetchIneIcon');
+
+        const year = yearInput.value;
+        const month = monthInput.value;
+        
+        if (!year || !month) {
+            statusDiv.innerHTML = '<span class="text-yellow-600 dark:text-yellow-400 flex items-center"><i class="fas fa-exclamation-triangle mr-1"></i>Selecciona índice, año y mes.</span>';
+            return;
+        }
+
+        // Estado de búsqueda
+        statusDiv.innerHTML = `<span class="text-blue-600 dark:text-blue-400 flex items-center"><i class="fas fa-spinner fa-spin mr-1"></i>Buscando ${indexType.toUpperCase()} en INE...</span>`;
+        fetchButton.disabled = true;
+        fetchIcon.className = 'fas fa-spinner fa-spin mr-2';
+        percentageInput.value = '';
+        percentageInput.readOnly = true;
+        percentageInput.classList.add('bg-gray-100', 'dark:bg-gray-700');
+        addButton.disabled = true;
+
+        const fetchUrl = (indexType === 'ipc') ? `{{ url_for('ipc_bp.get_ine_ipc_value_route', year=0, month=0) }}`.replace('/0/0', `/${year}/${month}`)
+                                               : `{{ url_for('ipc_bp.get_ine_irav_value_route', year=0, month=0) }}`.replace('/0/0', `/${year}/${month}`);
+        
+        try {
+            const response = await fetch(fetchUrl);
+            let result = {};
+            let message = `Error servidor (${response.status})`;
+            let iconClass = 'fas fa-times-circle';
+            let colorClass = 'text-red-600 dark:text-red-400';
+            let allowAdd = false;
+
+            if (response.ok) {
+                result = await response.json();
+                message = result.message || '';
+                
+                if (result.status === 'found') {
+                    percentageInput.value = parseFloat(result.value).toLocaleString('es-ES', { 
+                        minimumFractionDigits: 2, 
+                        maximumFractionDigits: 3 
+                    }).replace('.', ',');
+                    percentageInput.readOnly = false;
+                    percentageInput.classList.remove('bg-gray-100', 'dark:bg-gray-700');
+                    addButton.disabled = false;
+                    allowAdd = true;
+                    iconClass = 'fas fa-check-circle';
+                    colorClass = 'text-green-600 dark:text-green-400';
+                } else if (result.status === 'exists') {
+                    percentageInput.value = parseFloat(result.value).toLocaleString('es-ES', { 
+                        minimumFractionDigits: 2, 
+                        maximumFractionDigits: 3 
+                    }).replace('.', ',');
+                    iconClass = 'fas fa-info-circle';
+                    colorClass = 'text-blue-600 dark:text-blue-400';
+                    message = result.message || `Valor ${indexType.toUpperCase()} ya registrado.`;
+                    percentageInput.readOnly = true;
+                    percentageInput.classList.add('bg-gray-100', 'dark:bg-gray-700');
+                    addButton.disabled = true;
+                } else {
+                    iconClass = 'fas fa-exclamation-triangle';
+                    colorClass = 'text-yellow-600 dark:text-yellow-400';
+                    message = result.message || `No encontrado en INE para ${indexType.toUpperCase()}.`;
+                }
+            } else {
+                try {
+                    const errData = await response.json();
+                    message = errData.message || message;
+                } catch (e) {}
+                colorClass = 'text-red-600 dark:text-red-400';
+            }
+
+            statusDiv.innerHTML = `<span class="${colorClass} flex items-center"><i class="${iconClass} mr-1"></i>${message}</span>`;
+            addButton.disabled = !allowAdd;
+
+        } catch (error) {
+            console.error(`Error fetching specific ${indexType.toUpperCase()}:`, error);
+            statusDiv.innerHTML = `<span class="text-red-600 dark:text-red-400 flex items-center"><i class="fas fa-exclamation-triangle mr-1"></i>Error: ${error.message || "No se pudo conectar."}</span>`;
+            percentageInput.value = '';
+            percentageInput.readOnly = true;
+            percentageInput.classList.add('bg-gray-100', 'dark:bg-gray-700');
+            addButton.disabled = true;
+        } finally {
+            fetchButton.disabled = false;
+            fetchIcon.className = 'fas fa-search mr-2';
+        }
+    }
+
+    // Preparar datos para el formulario rápido
+    function prepareQuickAddData() {
+        const indexType = document.getElementById('indexTypeSelect').value;
+        const form = document.getElementById('quickAddForm');
+        const percentageInput = document.getElementById('indexPercentageQuickAdd');
+        const valueStr = percentageInput.value.replace(',', '.');
+
+        if (!percentageInput.value.trim() || isNaN(parseFloat(valueStr))) {
+            document.getElementById('quickAddStatus').innerHTML = '<span class="text-red-600 dark:text-red-400 flex items-center"><i class="fas fa-times-circle mr-1"></i>Porcentaje inválido. Introduce un número.</span>';
+            percentageInput.focus();
+            return false;
+        }
+
+        // Asignar a los campos ocultos
+        document.getElementById('quickAddYearHidden').value = document.getElementById('indexYearQuickAdd').value;
+        document.getElementById('quickAddMonthHidden').value = document.getElementById('indexMonthQuickAdd').value;
+        document.getElementById('quickAddPercentageHidden').value = valueStr;
+
+        // Cambiar el action del form dinámicamente
+        form.action = (indexType === 'ipc') ? "{{ url_for('ipc_bp.add_ipc_manual_route') }}"
+                                            : "{{ url_for('ipc_bp.add_irav_manual_route') }}";
+
+        const addButton = document.getElementById('quickAddButton');
+        if (addButton) addButton.disabled = true;
+        
+        const statusDiv = document.getElementById('quickAddStatus');
+        if(statusDiv) statusDiv.innerHTML = '<span class="text-blue-600 dark:text-blue-400 flex items-center"><i class="fas fa-spinner fa-spin mr-1"></i>Guardando...</span>';
+        
+        return true;
+    }
+
+    // Inicialización
+    document.addEventListener("DOMContentLoaded", function() {
+        // Aplicar filtros iniciales
+        filterIndexData('ipc', document.getElementById('ipcFilterYear').value);
+        filterIndexData('irav', document.getElementById('iravFilterYear').value);
+        
+        // Limpiar estados iniciales
+        const statusDiv = document.getElementById('quickAddStatus');
+        if(statusDiv) statusDiv.innerHTML = '';
+        
+        const percentageInput = document.getElementById('indexPercentageQuickAdd');
+        if(percentageInput) {
+            percentageInput.value = '';
+            percentageInput.readOnly = true;
+            percentageInput.classList.add('bg-gray-100', 'dark:bg-gray-700');
+        }
+        
+        const addButton = document.getElementById('quickAddButton');
+        if(addButton) addButton.disabled = true;
+
+        console.log("Sistema de gestión de índices inicializado correctamente");
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,1456 @@
+<!DOCTYPE html>
+<html lang="es" class="{% if settings and settings.dark_mode %}dark{% endif %}"> {# Aplicar dark mode inicial desde settings #}
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {# --- CSRF META TAG --- #}
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+
+	<link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
+	
+	<!-- Tom Select CSS -->
+	<link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
+	<!-- O si prefieres el tema por defecto (más genérico y adaptable a Tailwind): -->
+	<!-- <link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.default.min.css" rel="stylesheet"> -->
+
+	<!-- Tom Select JS (defer para que se cargue después del HTML) -->
+	<script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js" defer></script>	
+
+    <title>{% block title %}RentalSys{% endblock %}</title>
+
+    <!-- Tailwind CSS (CDN para desarrollo) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet"
+          href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+          integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw=="
+          crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+    <!-- Chart.js (si lo usas) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
+
+    <!-- Estilos personalizados -->
+    <style>
+        /* Tus estilos personalizados (efecto 3D, sidebar, badges, etc.) */
+        /* ... (Mantenemos los estilos que ya tenías) ... */
+        input.form-input, select.form-input, textarea.form-input { background: #f9fafb; border: 1px solid #d1d5db; box-shadow: 0 1px 2px rgba(0,0,0,.06), 0 1px 1px rgba(0,0,0,.04), inset 0 1px 0 rgba(255,255,255,.8); border-radius: .375rem; transition: box-shadow .15s ease, transform .15s ease; }
+        input.form-input:focus, select.form-input:focus, textarea.form-input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,.25), 0 2px 4px rgba(0,0,0,.1), inset 0 1px 0 rgba(255,255,255,.8); transform: translateY(-1px); }
+        .dark input.form-input, .dark select.form-input, .dark textarea.form-input { background: #1f2937; border-color: #374151; color: #d1d5db; box-shadow: 0 1px 2px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.05); }
+        .dark input.form-input:focus, .dark select.form-input:focus, .dark textarea.form-input:focus { border-color: #60a5fa; box-shadow: 0 0 0 2px rgba(96,165,250,.35), 0 2px 4px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.05); }
+        .sidebar { transition: width 0.3s ease-in-out, margin-left 0.3s ease-in-out; }
+        .sidebar-collapsed { width: 70px; } .sidebar-expanded { width: 250px; }
+        .sidebar-collapsed .sidebar-item-text, .sidebar-collapsed .sidebar-section-title, .sidebar-collapsed .sidebar-user-info, .sidebar-collapsed .sidebar-brand-text { display: none; }
+        .sidebar-expanded .sidebar-item-text, .sidebar-expanded .sidebar-section-title, .sidebar-expanded .sidebar-user-info, .sidebar-expanded .sidebar-brand-text { display: block; }
+        .sidebar-collapsed nav ul li a { justify-content: center; } .sidebar-collapsed nav ul li a .sidebar-icon { margin-right: 0; } .sidebar-collapsed .sidebar-user > div { justify-content: center; }
+        .main-content { transition: margin-left 0.3s ease-in-out; }
+        .form-input { @apply mt-0 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 dark:focus:ring-offset-gray-800; }
+        select.form-input { @apply pr-10; }
+        .sidebar nav ul li a { padding-top: .25rem; padding-bottom: .25rem; } .sidebar-section-title { margin-bottom: .25rem; }
+        .highlight-row:hover { background-color: #f9fafb; } .dark .highlight-row:hover { background-color: #1f2937; }
+        .status-badge { display: inline-flex; padding: 0.125rem 0.5rem; font-size: 0.75rem; line-height: 1.25rem; font-weight: 600; border-radius: 9999px; text-transform: capitalize; }
+        .status-paid { background-color: #dcfce7; color: #16a34a; } .dark .status-paid { background-color: #14532d; color: #86efac; }
+        .status-pending { background-color: #fef9c3; color: #ca8a04; } .dark .status-pending { background-color: #713f12; color: #fde047; }
+        .status-cancelada { background-color: #fee2e2; color: #dc2626; text-decoration: line-through;} .dark .status-cancelada { background-color: #7f1d1d; color: #fca5a5; }
+        .status-overdue { background-color: #ffedd5; color: #f97316; } .dark .status-overdue { background-color: #7c2d12; color: #fdba74; }
+        .status-active { background-color: #dcfce7; color: #16a34a; } .dark .status-active { background-color: #14532d; color: #86efac; }
+        .status-inactive { background-color: #f3f4f6; color: #4b5563; } .dark .status-inactive { background-color: #374151; color: #d1d5db; }
+        .status-expired { background-color: #fecaca; color: #b91c1c; } .dark .status-expired { background-color: #7f1d1d; color: #fca5a5; }
+        .status-other { background-color: #e5e7eb; color: #4b5563; } .dark .status-other { background-color: #374151; color: #d1d5db; }
+        .status-facturado { background-color: #dcfce7; color: #16a34a; } .dark .status-facturado { background-color: #14532d; color: #86efac; }
+        .status-pendiente-gasto { background-color: #fef9c3; color: #ca8a04; } .dark .status-pendiente-gasto { background-color: #713f12; color: #fde047; }
+        .tab-active { border-bottom-width: 3px; border-color: #3b82f6; color: #3b82f6; font-weight: 600; } .dark .tab-active { border-color: #60a5fa; color: #60a5fa; }
+        .progress-bar { height: 8px; border-radius: 4px; overflow: hidden; background-color: #e5e7eb; } .dark .progress-bar { background-color: #374151; }
+        .progress-fill { height: 100%; background-color: #3b82f6; transition: width 0.3s ease; border-radius: 4px; }
+        
+		.toggle-bg {
+			@apply w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 dark:border-gray-600 peer-checked:bg-blue-600;
+		}		
+		@media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } /* ... */ }
+		
+		/* Estilos para Tom Select con Tailwind y modo oscuro - VERSIÓN FINAL */
+		.ts-wrapper .ts-control { 
+			background-color: #f9fafb !important;
+			border: 1px solid #d1d5db !important;
+			border-radius: 0.375rem !important;
+			padding: 0.5rem 3rem 0.5rem 0.75rem !important; /* Más padding derecho para ambas flechas */
+			box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
+			line-height: 1.25 !important; 
+			transition: border-color .15s ease-in-out, box-shadow .15s ease-in-out !important;
+			display: flex !important; 
+			align-items: center !important;
+			width: 100% !important;
+			min-height: 2.5rem !important;
+			font-size: 0.875rem !important;
+			position: relative !important;
+		}
+
+		.dark .ts-wrapper .ts-control {
+			background-color: #1f2937 !important;
+			border-color: #374151 !important;
+			color: #d1d5db !important;
+		}
+
+		.ts-wrapper.focus .ts-control,
+		.ts-wrapper.dropdown-active .ts-control {
+			border-color: #3b82f6 !important;
+			outline: 0 !important;
+			box-shadow: 0 0 0 0.2rem rgba(59, 130, 246, 0.25) !important;
+		}
+
+		.dark .ts-wrapper.focus .ts-control,
+		.dark .ts-wrapper.dropdown-active .ts-control {
+			 border-color: #60a5fa !important; 
+			 box-shadow: 0 0 0 0.2rem rgba(96, 165, 250, 0.35) !important;
+		}
+
+		/* Input dentro del control */
+		.ts-wrapper .ts-control > input { 
+			color: #111827 !important;
+			background-color: transparent !important; 
+			padding: 0 !important; 
+			margin: 0 !important;
+			border: none !important;
+			box-shadow: none !important;
+			flex-grow: 1 !important; 
+			font-size: 0.875rem !important;
+			text-align: left !important;
+		}
+
+		.dark .ts-wrapper .ts-control > input {
+			color: #f3f4f6 !important;
+		}
+
+		.ts-wrapper .ts-control > input::placeholder {
+			color: #6b7280 !important;
+			opacity: 1 !important;
+			text-align: left !important;
+		}
+
+		.dark .ts-wrapper .ts-control > input::placeholder {
+			color: #9ca3af !important;
+		}
+
+		/* MOVER LA FLECHA POR DEFECTO A LA DERECHA */
+		.ts-wrapper.single .ts-control::after,
+		.ts-wrapper .ts-control::after {
+			position: absolute !important;
+			right: 1.75rem !important; /* Un poco más a la izquierda que nuestra flecha */
+			top: 50% !important;
+			transform: translateY(-50%) !important;
+			border-top-color: #6b7280 !important;
+			border-left-color: transparent !important;
+			border-right-color: transparent !important;
+			border-bottom-color: transparent !important;
+			z-index: 5 !important; /* Debajo de nuestra flecha */
+		}
+
+		.dark .ts-wrapper.single .ts-control::after,
+		.dark .ts-wrapper .ts-control::after {
+			border-top-color: #9ca3af !important;
+		}
+
+		/* Dropdown */
+		.ts-wrapper .ts-dropdown {
+			background-color: #ffffff !important;
+			border: 1px solid #d1d5db !important;
+			border-radius: 0.375rem !important;
+			box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important; 
+			z-index: 50 !important; 
+			margin-top: 0.25rem !important; 
+			width: 100% !important; 
+			font-size: 0.875rem !important;
+		}
+
+		.dark .ts-wrapper .ts-dropdown {
+			background-color: #1f2937 !important;
+			border-color: #374151 !important;
+		}
+
+		.ts-wrapper .ts-dropdown .ts-dropdown-content {
+			max-height: 200px !important; 
+			overflow-y: auto !important;
+		}
+
+		/* Opciones del dropdown */
+		.ts-wrapper .ts-dropdown .ts-option {
+			padding: 0.5rem 0.75rem !important;
+			color: #111827 !important;
+			text-align: left !important;
+			cursor: pointer !important;
+			display: block !important;
+			width: 100% !important;
+		}
+
+		.ts-wrapper .ts-dropdown .ts-option * {
+			text-align: left !important;
+			display: block !important;
+			width: 100% !important;
+		}
+
+		.dark .ts-wrapper .ts-dropdown .ts-option {
+			color: #f3f4f6 !important;
+		}
+
+		.ts-wrapper .ts-dropdown .ts-option.active, 
+		.ts-wrapper .ts-dropdown .ts-option:hover {  
+			background-color: #eff6ff !important;
+			color: #1d4ed8 !important;
+		}
+
+		.dark .ts-wrapper .ts-dropdown .ts-option.active,
+		.dark .ts-wrapper .ts-dropdown .ts-option:hover {
+			background-color: #374151 !important;
+			color: #93c5fd !important;
+		}
+
+		/* Items seleccionados */
+		.ts-wrapper .item { 
+			color: #111827 !important;
+			background-color: transparent !important;
+			border: none !important;
+			padding: 0 !important;
+			margin: 0 !important;
+			display: flex !important;
+			align-items: center !important;
+			font-size: 0.875rem !important;
+			text-align: left !important;
+			width: 100% !important;
+		}
+
+		.dark .ts-wrapper .item {
+			color: #e5e7eb !important;
+		}
+
+		/* Iconos de FontAwesome en el control */
+		.ts-wrapper .ts-control .fas {
+			position: absolute !important;
+			left: 0.625rem !important;
+			top: 50% !important;
+			transform: translateY(-50%) !important;
+			color: #6b7280 !important;
+			font-size: 0.875rem !important;
+			pointer-events: none !important;
+			z-index: 10 !important;
+		}
+
+		.dark .ts-wrapper .ts-control .fas {
+			color: #9ca3af !important;
+		}
+
+		/* Ajustar padding del control cuando hay icono */
+		.ts-wrapper .ts-control.has-icon {
+			padding-left: 2rem !important;
+		}
+
+		.ts-wrapper .ts-control.has-icon > input {
+			padding-left: 0.5rem !important;
+		}
+
+		/* Nuestra flecha personalizada (más a la derecha) */
+		.ts-wrapper .ts-control .dropdown-arrow {
+			position: absolute !important;
+			right: 0.625rem !important; /* En el extremo derecho */
+			top: 50% !important;
+			transform: translateY(-50%) !important;
+			color: #6b7280 !important;
+			font-size: 0.875rem !important;
+			pointer-events: none !important;
+			z-index: 10 !important; /* Encima de la flecha por defecto */
+		}
+
+		.dark .ts-wrapper .ts-control .dropdown-arrow {
+			color: #9ca3af !important;
+		}
+
+		/* Estilos para subtexto */
+		.option-property-owner, .option-tenant-nif { 
+			font-size: 0.75rem !important;
+			color: #6b7280 !important;
+			margin-top: 0.125rem !important;
+			text-align: left !important;
+			display: block !important;
+			width: 100% !important;
+		}
+
+		.dark .option-property-owner, .dark .option-tenant-nif {
+			color: #9ca3af !important;
+		}
+
+		/* Estados de error */
+		.ts-wrapper.error .ts-control,
+		.ts-wrapper .ts-control.border-red-500 {
+			border-color: #ef4444 !important;
+			box-shadow: 0 0 0 0.2rem rgba(239, 68, 68, 0.25) !important;
+		}
+
+		.dark .ts-wrapper.error .ts-control,
+		.dark .ts-wrapper .ts-control.border-red-500 {
+			border-color: #f87171 !important;
+			box-shadow: 0 0 0 0.2rem rgba(248, 113, 113, 0.35) !important;
+		}
+
+		.ts-wrapper .ts-control > div {
+			text-align: left !important;
+			width: 100% !important;
+			display: flex !important;
+			align-items: center !important;
+			justify-content: flex-start !important;
+		}	
+		
+		.generar-facturas-destacado {
+			background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+			border-left: 4px solid #047857 !important;
+			box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3) !important;
+			transform: translateX(2px) !important;
+			position: relative !important;
+		}
+
+		.generar-facturas-destacado:hover {
+			background: linear-gradient(135deg, #059669 0%, #047857 100%) !important;
+			box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4) !important;
+			transform: translateX(4px) translateY(-1px) !important;
+		}
+
+		.generar-facturas-destacado::before {
+			content: '⚡';
+			position: absolute;
+			right: 8px;
+			top: 50%;
+			transform: translateY(-50%);
+			font-size: 14px;
+			animation: pulse-icon 2s infinite;
+		}
+
+		.sidebar-collapsed .generar-facturas-destacado::before {
+			display: none;
+		}
+
+		@keyframes pulse-icon {
+			0% { opacity: 0.7; }
+			50% { opacity: 1; }
+			100% { opacity: 0.7; }
+		}
+
+		.generar-facturas-text {
+			font-weight: 600 !important;
+			font-size: 0.95rem !important;
+		}
+
+		.generar-facturas-icon {
+			color: #fbbf24 !important;
+			filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+		}		
+		
+		/* Animaciones para notificaciones - AGREGAR AL CSS EXISTENTE */
+		.notification-enter {
+			animation: slideInRight 0.3s ease-out forwards;
+		}
+		.notification-exit {
+			animation: slideOutRight 0.3s ease-in forwards;
+		}
+		.modal-enter {
+			animation: modalFadeIn 0.3s ease-out forwards;
+		}
+		.modal-exit {
+			animation: modalFadeOut 0.3s ease-in forwards;
+		}
+
+		@keyframes slideInRight {
+			from {
+				transform: translateX(100%);
+				opacity: 0;
+			}
+			to {
+				transform: translateX(0);
+				opacity: 1;
+			}
+		}
+		@keyframes slideOutRight {
+			from {
+				transform: translateX(0);
+				opacity: 1;
+			}
+			to {
+				transform: translateX(100%);
+				opacity: 0;
+			}
+		}
+		@keyframes modalFadeIn {
+			from {
+				opacity: 0;
+				transform: scale(0.9);
+			}
+			to {
+				opacity: 1;
+				transform: scale(1);
+			}
+		}
+		@keyframes modalFadeOut {
+			from {
+				opacity: 1;
+				transform: scale(1);
+			}
+			to {
+				opacity: 0;
+				transform: scale(0.9);
+			}
+		}
+
+		/* === ESTILOS ADICIONALES PARA EL SIDEBAR PROFESIONAL === */
+
+		/* Scrollbar personalizada para el sidebar */
+		.custom-scrollbar {
+			scrollbar-width: thin;
+			scrollbar-color: rgba(147, 197, 253, 0.3) transparent;
+		}
+
+		.custom-scrollbar::-webkit-scrollbar {
+			width: 6px;
+		}
+
+		.custom-scrollbar::-webkit-scrollbar-track {
+			background: transparent;
+		}
+
+		.custom-scrollbar::-webkit-scrollbar-thumb {
+			background-color: rgba(147, 197, 253, 0.3);
+			border-radius: 3px;
+			transition: background-color 0.2s;
+		}
+
+		.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+			background-color: rgba(147, 197, 253, 0.5);
+		}
+
+		/* Enlaces del sidebar con efecto hover mejorado */
+		.sidebar-link {
+			position: relative;
+			overflow: hidden;
+		}
+
+		.sidebar-link::before {
+			content: '';
+			position: absolute;
+			top: 0;
+			left: -100%;
+			width: 100%;
+			height: 100%;
+			background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+			transition: left 0.5s;
+		}
+
+		.sidebar-link:hover::before {
+			left: 100%;
+		}
+
+		/* Estado activo del sidebar */
+		.sidebar-active {
+			background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.25) 100%);
+			box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+		}
+
+		.sidebar-active .sidebar-icon {
+			color: #fbbf24;
+			filter: drop-shadow(0 0 4px rgba(251, 191, 36, 0.5));
+		}
+
+		/* Animación para iconos en hover */
+		.sidebar-link:hover .sidebar-icon {
+			transform: scale(1.1) rotate(5deg);
+			transition: transform 0.2s ease;
+		}
+
+		/* Tooltip para sidebar colapsado */
+		.sidebar-collapsed .sidebar-link {
+			position: relative;
+		}
+
+		.sidebar-collapsed .sidebar-link::after {
+			content: attr(title);
+			position: absolute;
+			left: 100%;
+			top: 50%;
+			transform: translateY(-50%);
+			margin-left: 1rem;
+			padding: 0.5rem 0.75rem;
+			background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+			color: white;
+			font-size: 0.875rem;
+			font-weight: 500;
+			white-space: nowrap;
+			border-radius: 0.5rem;
+			opacity: 0;
+			pointer-events: none;
+			transition: opacity 0.2s ease;
+			z-index: 50;
+			box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+			border: 1px solid rgba(255,255,255,0.1);
+		}
+
+		.sidebar-collapsed .sidebar-link:hover::after {
+			opacity: 1;
+		}
+
+		/* Indicador de notificaciones en el sidebar */
+		.sidebar-notification-badge {
+			position: absolute;
+			top: 8px;
+			right: 8px;
+			min-width: 18px;
+			height: 18px;
+			background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+			color: white;
+			font-size: 10px;
+			font-weight: bold;
+			border-radius: 9px;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			padding: 0 4px;
+			box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+			animation: pulse-badge 2s infinite;
+		}
+
+		@keyframes pulse-badge {
+			0% { transform: scale(1); box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+			50% { transform: scale(1.05); box-shadow: 0 2px 8px rgba(239,68,68,0.4); }
+			100% { transform: scale(1); box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+		}
+
+		/* Mejora del botón Generar Facturas */
+		.generar-facturas-destacado {
+			background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+			border: 1px solid rgba(255,255,255,0.2);
+			box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3), inset 0 1px 0 rgba(255,255,255,0.2);
+			transform: translateX(0);
+			position: relative;
+		}
+
+		.generar-facturas-destacado:hover {
+			background: linear-gradient(135deg, #059669 0%, #047857 100%);
+			box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4), inset 0 1px 0 rgba(255,255,255,0.2);
+			transform: translateX(2px) translateY(-1px);
+		}
+
+		.generar-facturas-destacado::after {
+			content: '';
+			position: absolute;
+			top: -50%;
+			left: -50%;
+			width: 200%;
+			height: 200%;
+			background: linear-gradient(45deg, transparent 30%, rgba(255,255,255,0.1) 50%, transparent 70%);
+			transform: rotate(45deg) translateX(-100%);
+			transition: transform 0.6s;
+		}
+
+		.generar-facturas-destacado:hover::after {
+			transform: rotate(45deg) translateX(100%);
+		}
+
+		/* Animación del icono magic */
+		@keyframes sparkle {
+			0%, 100% { opacity: 0; transform: scale(0) rotate(0deg); }
+			50% { opacity: 1; transform: scale(1) rotate(180deg); }
+		}
+
+		.generar-facturas-icon {
+			position: relative;
+		}
+
+		.generar-facturas-icon::after {
+			content: '✨';
+			position: absolute;
+			top: -5px;
+			right: -5px;
+			font-size: 8px;
+			animation: sparkle 2s infinite;
+		}
+
+		/* Transiciones suaves para colapsar/expandir */
+		.sidebar-section-title span,
+		.sidebar-item-text,
+		.sidebar-user-info {
+			transition: opacity 0.3s ease, transform 0.3s ease;
+		}
+
+		.sidebar-collapsed .sidebar-section-title span,
+		.sidebar-collapsed .sidebar-item-text,
+		.sidebar-collapsed .sidebar-user-info {
+			opacity: 0;
+			transform: translateX(-10px);
+		}
+
+		.sidebar-expanded .sidebar-section-title span,
+		.sidebar-expanded .sidebar-item-text,
+		.sidebar-expanded .sidebar-user-info {
+			opacity: 1;
+			transform: translateX(0);
+		}
+
+		/* Hover effect para secciones */
+		.sidebar h2:hover {
+			color: #ffffff;
+		}
+
+		/* Mejora visual para los badges de conteo */
+		.sidebar-section-title span.bg-blue-700\/30 {
+			backdrop-filter: blur(4px);
+			border: 1px solid rgba(147, 197, 253, 0.2);
+		}
+
+		/* Efecto de elevación en items activos */
+		.sidebar-active {
+			transform: translateX(2px);
+			transition: all 0.3s ease;
+		}
+
+		/* Mejora del footer del usuario */
+		.sidebar-user:hover .group > div:first-child {
+			transform: scale(1.05);
+		}
+
+		/* Animación suave para el indicador de estado online */
+		@keyframes pulse-online {
+			0%, 100% { opacity: 1; transform: scale(1); }
+			50% { opacity: 0.8; transform: scale(1.2); }
+		}
+
+		.sidebar-user .animate-pulse {
+			animation: pulse-online 2s infinite;
+		}
+
+		/* Estilo para el botón de toggle mejorado */
+		#toggleSidebar {
+			backdrop-filter: blur(10px);
+			background-color: rgba(255,255,255,0.05);
+		}
+
+		#toggleSidebar:hover {
+			background-color: rgba(255,255,255,0.15);
+			transform: rotate(90deg);
+		}
+
+		/* Separadores más elegantes */
+		.sidebar .border-t {
+			background: linear-gradient(90deg, transparent, rgba(147, 197, 253, 0.3), transparent);
+			height: 1px;
+			border: none;
+		}
+
+		/* Mejora de los tags Admin */
+		.text-xs.bg-red-500\/20 {
+			backdrop-filter: blur(4px);
+			border: 1px solid rgba(248, 113, 113, 0.3);
+			font-weight: 600;
+			letter-spacing: 0.025em;
+		}
+
+		/* Efecto para los iconos de sección */
+		.sidebar h2 .fas {
+			transition: transform 0.3s ease;
+		}
+
+		.sidebar h2:hover .fas {
+			transform: rotate(15deg);
+		}
+
+		/* Mejora visual cuando el sidebar está colapsado */
+		.sidebar-collapsed {
+			box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+		}
+
+		.sidebar-collapsed .p-4 {
+			padding: 1rem 0.5rem;
+		}
+
+		.sidebar-collapsed .sidebar-link {
+			justify-content: center;
+			padding-left: 0.5rem;
+			padding-right: 0.5rem;
+		}
+
+		.sidebar-collapsed .sidebar-icon {
+			margin-right: 0;
+			font-size: 1.125rem;
+		}
+		
+		
+		/* Hacer que los botones tengan el mismo ancho en móvil */
+		@media (max-width: 640px) {
+		  .sm\:flex-row button {
+			width: 100%;
+		  }
+		}
+
+		/* Efecto hover más suave */
+		button {
+		  transition: all 0.2s ease-in-out;
+		}
+
+		button:active {
+		  transform: scale(0.98);
+		}		
+		
+		
+    </style>
+
+    {# Dark mode inicial usando settings si está disponible #}
+    <script>
+      // Función para activar dark mode
+      const activateDarkMode = () => {
+        document.documentElement.classList.add('dark');
+        try { localStorage.setItem('darkMode', 'true'); } catch (e) {}
+      };
+      // Función para desactivar dark mode
+      const deactivateDarkMode = () => {
+        document.documentElement.classList.remove('dark');
+        try { localStorage.setItem('darkMode', 'false'); } catch (e) {}
+      };
+      // Comprobar settings (si existe g.settings en el contexto inicial, lo usamos)
+      const serverDarkMode = {% if settings %}{{ settings.dark_mode | tojson }}{% else %}null{% endif %};
+
+      if (serverDarkMode === true) {
+        activateDarkMode();
+      } else if (serverDarkMode === false) {
+        deactivateDarkMode();
+      } else {
+        // Si no hay setting del servidor, usar localStorage o preferencia del sistema
+        if (localStorage.getItem('darkMode') === 'true' ||
+            (!('darkMode' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+          activateDarkMode();
+        } else {
+          deactivateDarkMode(); // Asegurarse que no esté activo si no cumple condiciones
+        }
+      }
+    </script>
+
+    {# Bloque para estilos específicos de la página hija #}
+    {% block styles %}{% endblock %}
+</head>
+
+<body class="bg-gray-100 dark:bg-gray-900 font-sans">
+<div class="flex h-screen overflow-hidden">
+
+    {# --- SIDEBAR (Solo si está autenticado) --- #}
+    {% if current_user.is_authenticated %}
+        {% set initial_sidebar_collapsed = request.cookies.get('rentalsys_sidebar_collapsed', 'false') == 'true' %}
+        <div class="sidebar fixed inset-y-0 left-0 z-30 {% if initial_sidebar_collapsed %}sidebar-collapsed{% else %}sidebar-expanded{% endif %} bg-gradient-to-b from-blue-900 via-blue-800 to-blue-900 text-white flex flex-col print:hidden shadow-2xl overflow-hidden">
+            
+            {# Elemento decorativo de fondo #}
+            <div class="absolute inset-0 opacity-10">
+                <div class="absolute inset-0" style="background-image: url('data:image/svg+xml,%3Csvg width="60" height="60" xmlns="http://www.w3.org/2000/svg"%3E%3Cdefs%3E%3Cpattern id="grid" width="60" height="60" patternUnits="userSpaceOnUse"%3E%3Cpath d="M0 60L60 0M0 0L60 60" stroke="rgba(255,255,255,0.1)" stroke-width="1"/%3E%3C/pattern%3E%3C/defs%3E%3Crect width="100%25" height="100%25" fill="url(%23grid)"/%3E%3C/svg%3E');"></div>
+            </div>
+            
+            {# Cabecera Sidebar #}
+            <div class="relative p-4 flex items-center {% if not initial_sidebar_collapsed %}justify-between{% else %}justify-center{% endif %} border-b border-blue-700/50 flex-shrink-0 backdrop-blur-sm bg-blue-900/30">
+                <a href="{{ url_for('main_bp.dashboard') }}" class="flex items-center text-white group">
+                    <div class="relative">
+                        <div class="absolute inset-0 bg-white/20 rounded-lg blur-lg group-hover:bg-white/30 transition-all duration-300"></div>
+                        <img src="{{ url_for('static', filename='images/logo_rentalsys_256.png') }}"
+                             alt="RentalSys Logo"
+                             class="relative h-8 w-auto {% if not initial_sidebar_collapsed %}mr-3{% endif %} group-hover:scale-110 transition-transform duration-300">
+                    </div>
+                    <span class="text-xl font-bold whitespace-nowrap sidebar-brand-text {% if initial_sidebar_collapsed %}hidden{% endif %} tracking-wide">
+                        RentalSys
+                    </span>
+                </a>
+                <button id="toggleSidebar" class="text-white p-2 rounded-lg hover:bg-white/10 backdrop-blur-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-white/30" aria-label="Toggle sidebar">
+                    <i class="fas fa-bars text-sm"></i>
+                </button>
+            </div>
+            
+            {# Navegación Sidebar #}
+            <nav class="flex-1 overflow-y-auto custom-scrollbar">
+                <div class="p-2 sm:p-3">
+                    
+                    {# Menú Principal #}
+                    <div class="mb-6">
+                        <h2 class="flex items-center text-xs uppercase font-bold text-blue-200/70 mb-3 px-3 sidebar-section-title tracking-wider">
+                            <i class="fas fa-layer-group mr-2 text-blue-300/50"></i>
+                            <span>Principal</span>
+                            <span class="ml-auto text-xs bg-blue-700/30 px-2 py-0.5 rounded-full">6</span>
+                        </h2>
+                        <ul class="space-y-1">
+                            {# Dashboard #}
+                            <li>
+                                <a href="{{ url_for('main_bp.dashboard') }}" title="Dashboard" 
+                                   class="sidebar-link flex items-center p-2.5 rounded-lg transition-all duration-200 text-sm sm:text-base relative group
+                                          {% if request.endpoint == 'main_bp.dashboard' %}sidebar-active bg-white/20 shadow-md{% else %}hover:bg-white/10{% endif %}">
+                                    <i class="fas fa-tachometer-alt mr-3 w-5 text-center sidebar-icon {% if request.endpoint == 'main_bp.dashboard' %}text-yellow-300{% endif %}"></i>
+                                    <span class="whitespace-nowrap sidebar-item-text font-medium">Dashboard</span>
+                                    {% if request.endpoint == 'main_bp.dashboard' %}
+                                    <span class="absolute right-0 top-0 bottom-0 w-1 bg-yellow-400 rounded-r-lg"></span>
+                                    {% endif %}
+                                </a>
+                            </li>
+                            
+                            {# Generar Facturas (Destacado) #}
+                            <li>
+                                <a href="{{ url_for('facturas_bp.generar_facturas_mes') }}" 
+                                   title="Generar Facturas" 
+                                   class="generar-facturas-destacado flex items-center p-3 rounded-lg transition-all duration-300 text-sm sm:text-base relative overflow-hidden group
+                                          {% if request.endpoint == 'facturas_bp.generar_facturas_mes' %}ring-2 ring-green-400/50{% endif %}">
+                                    <div class="absolute inset-0 bg-gradient-to-r from-green-600/20 to-green-500/20 animate-pulse"></div>
+                                    <i class="fas fa-magic generar-facturas-icon mr-3 w-5 text-center sidebar-icon relative z-10"></i>
+                                    <span class="whitespace-nowrap sidebar-item-text generar-facturas-text relative z-10">Generar Facturas</span>
+                                    <i class="fas fa-bolt ml-auto text-yellow-300 text-xs sidebar-item-text animate-pulse"></i>
+                                </a>
+                            </li>
+                            
+                            {# Lista Facturas #}
+                            <li>
+                                <a href="{{ url_for('facturas_bp.listar_facturas') }}" title="Lista Facturas" 
+                                   class="sidebar-link flex items-center p-2.5 rounded-lg transition-all duration-200 text-sm sm:text-base group
+                                          {% if request.endpoint == 'facturas_bp.listar_facturas' %}sidebar-active bg-white/20{% else %}hover:bg-white/10{% endif %}">
+                                    <i class="fas fa-file-invoice mr-3 w-5 text-center sidebar-icon"></i>
+                                    <span class="whitespace-nowrap sidebar-item-text">Lista Facturas</span>
+                                </a>
+                            </li>
+                            
+                            {# Borrado Masivo #}
+                            <li>
+                                <a href="{{ url_for('facturas_bp.borrar_facturas_masivo') }}" title="Borrar Facturas Masivo"
+                                   class="sidebar-link flex items-center p-2.5 rounded-lg transition-all duration-200 text-sm sm:text-base group
+                                          {% if request.endpoint == 'facturas_bp.borrar_facturas_masivo' %}sidebar-active bg-white/20{% else %}hover:bg-white/10{% endif %}">
+                                    <i class="fas fa-trash-alt mr-3 w-5 text-center sidebar-icon"></i>
+                                    <span class="whitespace-nowrap sidebar-item-text">Borrado Masivo</span>
+                                </a>
+                            </li>
+                            
+                            {# Envío Masivo #}
+                            <li>
+                                <a href="{{ url_for('facturas_bp.enviar_facturas_masivo') }}" title="Envío Masivo Emails" 
+                                   class="sidebar-link flex items-center p-2.5 rounded-lg transition-all duration-200 text-sm sm:text-base group
+                                          {% if request.endpoint == 'facturas_bp.enviar_facturas_masivo' %}sidebar-active bg-white/20{% else %}hover:bg-white/10{% endif %}">
+                                    <i class="fas fa-paper-plane mr-3 w-5 text-center sidebar-icon"></i>
+                                    <span class="whitespace-nowrap sidebar-item-text">Envío Masivo</span>
+                                </a>
+                            </li>
+                            
+                            {# Gestión Gastos #}
+                            <li>
+                                <a href="{{ url_for('facturas_bp.gestionar_gastos') }}" title="Gestión de Gastos" 
+                                   class="sidebar-link flex items-center p-2.5 rounded-lg transition-all duration-200 text-sm sm:text-base group
+                                          {% if request.endpoint == 'facturas_bp.gestionar_gastos' %}sidebar-active bg-white/20{% else %}hover:bg-white/10{% endif %}">
+                                    <i class="fas fa-receipt mr-3 w-5 text-center sidebar-icon"></i>
+                                    <span class="whitespace-nowrap sidebar-item-text">Gestión Gastos</span>
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                    
+                    {# Menú Gestión #}
+                    <div class="mb-6">
+                        <h2 class="flex items-center text-xs uppercase font-bold text-blue-200/70 mb-3 px-3 sidebar-section-title tracking-wider">
+                            <i class="fas fa-cogs mr-2 text-blue-300/50"></i>
+                            <span>Gestión</span>
+                            <span class="ml-auto text-xs bg-blue-700/30 px-2 py-0.5 rounded-full">6</span>
+                        </h2>
+                        <ul class="space-y-1">
+                            {# Propietarios #}
+                            <li>
+                                <a href="{{ url_for('propietarios_bp.listar_propietarios') }}" title="Propietarios" 
+                                   class="sidebar-link flex items-center p-2.5 rounded-lg transition-all duration-200 text-sm sm:text-base group
+                                          {% if request.endpoint.startswith('propietarios_bp.') %}sidebar-active bg-white/20{% else %}hover:bg-white/10{% endif %}">
+                                    <i class="fas fa-user-tie mr-3 w-5 text-center sidebar-icon"></i>
+                                    <span class="sidebar-item-text">Propietarios</span>
+                                    {% if request.endpoint.startswith('propietarios_bp.') %}
+                                    <span class="ml-auto w-2 h-2 bg-blue-400 rounded-full sidebar-item-text"></span>
+                                    {% endif %}
+                                </a>
+                            </li>
+                            
+                            {# Inquilinos #}
+                            <li>
+                                <a href="{{ url_for('inquilinos_bp.listar_inquilinos') }}" title="Inquilinos" 
+                                   class="sidebar-link flex items-center p-2.5 rounded-lg transition-all duration-200 text-sm sm:text-base group
+                                          {% if request.endpoint.startswith('inquilinos_bp.') %}sidebar-active bg-white/20{% else %}hover:bg-white/10{% endif %}">
+                                    <i class="fas fa-users mr-3 w-5 text-center sidebar-icon"></i>
+                                    <span class="sidebar-item-text">Inquilinos</span>
+                                </a>
+                            </li>
+                            
+                            {# Propiedades #}
+                            <li>
+                                <a href="{{ url_for('propiedades_bp.listar_propiedades') }}" title="Propiedades" 
+                                   class="sidebar-link flex items-center p-2.5 rounded-lg transition-all duration-200 text-sm sm:text-base group
+                                          {% if request.endpoint.startswith('propiedades_bp.') %}sidebar-active bg-white/20{% else %}hover:bg-white/10{% endif %}">
+                                    <i class="fas fa-home mr-3 w-5 text-center sidebar-icon"></i>
+                                    <span class="sidebar-item-text">Propiedades</span>
+                                </a>
+                            </li>
+                            
+                            {# Contratos #}
+                            <li>
+                                <a href="{{ url_for('contratos_bp.listar_contratos') }}" title="Contratos" 
+                                   class="sidebar-link flex items-center p-2.5 rounded-lg transition-all duration-200 text-sm sm:text-base group
+                                          {% if request.endpoint.startswith('contratos_bp.') %}sidebar-active bg-white/20{% else %}hover:bg-white/10{% endif %}">
+                                    <i class="fas fa-file-contract mr-3 w-5 text-center sidebar-icon"></i>
+                                    <span class="sidebar-item-text">Contratos</span>
+                                </a>
+                            </li>
+                            
+                            {# Gestión Índices #}
+                            <li>
+                                <a href="{{ url_for('ipc_bp.listar_indices') }}" title="Gestión Índices" 
+                                   class="sidebar-link flex items-center p-2.5 rounded-lg transition-all duration-200 text-sm sm:text-base group
+                                          {% if request.endpoint.startswith('ipc_bp.') %}sidebar-active bg-white/20{% else %}hover:bg-white/10{% endif %}">
+                                    <i class="fas fa-chart-line mr-3 w-5 text-center sidebar-icon"></i>
+                                    <span class="sidebar-item-text">Gestión Índices</span>
+                                </a>
+                            </li>
+                            
+                            {# Exportar Facturas #}
+                            <li>
+                                <a href="{{ url_for('reports_bp.exportar_facturas_csv') }}" title="Exportar Facturas"
+                                   class="sidebar-link flex items-center p-2.5 rounded-lg transition-all duration-200 text-sm sm:text-base group
+                                          {% if request.endpoint.startswith('reports_bp.') %}sidebar-active bg-white/20{% else %}hover:bg-white/10{% endif %}">
+                                    <i class="fas fa-file-export mr-3 w-5 text-center sidebar-icon"></i>
+                                    <span class="whitespace-nowrap sidebar-item-text">Exportar Facturas</span>
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                    
+                    {# Menú Configuración y Administración #}
+                    <div>
+                        <h2 class="flex items-center text-xs uppercase font-bold text-blue-200/70 mb-3 px-3 sidebar-section-title tracking-wider">
+                            <i class="fas fa-shield-alt mr-2 text-blue-300/50"></i>
+                            <span>Sistema</span>
+                        </h2>
+                        <ul class="space-y-1">
+                            {# --- ENLACE GESTIONAR USUARIOS (Solo Admin) --- #}
+                            {% if current_user.role == 'admin' %}
+                                <li>
+                                    <a href="{{ url_for('admin_users_bp.list_users') }}" title="Gestionar Usuarios" 
+                                       class="sidebar-link flex items-center p-2.5 rounded-lg transition-all duration-200 text-sm sm:text-base group
+                                              {% if request.endpoint.startswith('admin_users_bp.') %}sidebar-active bg-white/20{% else %}hover:bg-white/10{% endif %}">
+                                        <i class="fas fa-users-cog mr-3 w-5 text-center sidebar-icon"></i>
+                                        <span class="sidebar-item-text">Usuarios</span>
+                                        <span class="ml-auto sidebar-item-text">
+                                            <span class="text-xs bg-red-500/20 text-red-300 px-2 py-0.5 rounded-full font-medium">Admin</span>
+                                        </span>
+                                    </a>
+                                </li>
+                            {% endif %}
+                            
+                            {# --- ENLACE AJUSTES (Solo Admin) --- #}
+                            {% if current_user.role == 'admin' %}
+                                <li>
+                                    <a href="{{ url_for('main_bp.ajustes_view') }}" title="Ajustes" 
+                                       class="sidebar-link flex items-center p-2.5 rounded-lg transition-all duration-200 text-sm sm:text-base group
+                                              {% if request.endpoint == 'main_bp.ajustes_view' %}sidebar-active bg-white/20{% else %}hover:bg-white/10{% endif %}">
+                                        <i class="fas fa-cog mr-3 w-5 text-center sidebar-icon"></i>
+                                        <span class="sidebar-item-text">Ajustes</span>
+                                        <span class="ml-auto sidebar-item-text">
+                                            <span class="text-xs bg-red-500/20 text-red-300 px-2 py-0.5 rounded-full font-medium">Admin</span>
+                                        </span>
+                                    </a>
+                                </li>
+                            {% endif %}
+                            
+                            {# Separador #}
+                            <li class="my-3 px-3">
+                                <div class="border-t border-blue-700/30"></div>
+                            </li>
+                            
+                            {# Enlace Logout #}
+                            <li>
+                                <a href="{{ url_for('auth_bp.logout') }}" title="Cerrar Sesión" 
+                                   class="flex items-center p-2.5 rounded-lg transition-all duration-200 text-sm sm:text-base hover:bg-red-600/20 group">
+                                    <i class="fas fa-sign-out-alt mr-3 w-5 text-center sidebar-icon text-red-300"></i>
+                                    <span class="sidebar-item-text text-red-300 group-hover:text-red-200">Cerrar Sesión</span>
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </nav>
+            
+            {# Footer usuario Sidebar (Simplificado, ya que está en el header) #}
+            <div class="relative p-4 border-t border-blue-700/50 flex-shrink-0 sidebar-user bg-blue-900/30 backdrop-blur-sm">
+                <div class="absolute inset-0 bg-gradient-to-t from-blue-900/50 to-transparent"></div>
+                <div class="relative flex items-center {% if initial_sidebar_collapsed %}justify-center{% endif %}">
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-r from-blue-400 to-blue-600 rounded-full blur-md opacity-50 group-hover:opacity-75 transition-opacity"></div>
+                        <div class="relative w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center flex-shrink-0 text-white font-bold shadow-lg ring-2 ring-white/20">
+                            {{ current_user.username[0]|upper if current_user.username else '?' }}
+                        </div>
+                    </div>
+                    <div class="ml-3 sidebar-user-info overflow-hidden {% if initial_sidebar_collapsed %}hidden{% endif %}">
+                        <p class="text-sm font-semibold truncate">{{ current_user.username }}</p>
+                        <p class="text-xs text-blue-200/70 truncate flex items-center">
+                            <span class="w-2 h-2 bg-green-400 rounded-full mr-1 animate-pulse"></span>
+                            {{ current_user.role|capitalize }}
+                        </p>
+                    </div>
+                    <div class="ml-auto sidebar-user-info {% if initial_sidebar_collapsed %}hidden{% endif %}">
+                        <button onclick="showModal('userProfileModal')" class="text-blue-200 hover:text-white transition-colors" title="Ver perfil">
+                            <i class="fas fa-ellipsis-v text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %} {# --- FIN current_user.is_authenticated para SIDEBAR --- #}
+
+    {# --- MAIN CONTENT --- #}
+    {# Ajustar margen izquierdo si el sidebar está presente y NO colapsado #}
+    <div id="mainContentArea" class="main-content flex-1 flex flex-col overflow-hidden
+         {% if current_user.is_authenticated %}
+             {% set is_collapsed = request.cookies.get('rentalsys_sidebar_collapsed', 'false') == 'true' %}
+             {% if is_collapsed %} ml-[70px] {% else %} ml-[250px] {% endif %}
+         {% else %}
+             ml-0
+         {% endif %}">
+
+        {# --- HEADER (Solo si está autenticado) --- #}
+        {% if current_user.is_authenticated %}
+            <header class="bg-white dark:bg-gray-800 shadow-sm print:hidden flex-shrink-0">
+                <div class="flex items-center justify-between px-4 sm:px-6 py-3">
+                    {# Título del Header #}
+                    <h1 class="text-xl sm:text-2xl font-semibold text-gray-800 dark:text-gray-100">
+                        {% block header_title %}{{ title | default('RentalSys') }}{% endblock %}
+                    </h1>
+                     {# Iconos y Menú Usuario #}
+                    <div class="flex items-center space-x-3 sm:space-x-4">
+                        {# Notificaciones #}
+                        <a href="{{ url_for('main_bp.notifications') }}" class="relative p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 dark:focus:ring-offset-gray-800" title="Notificaciones">
+                            <i class="fas fa-bell"></i>
+                            {% if unread_notifications_count > 0 %}
+                                <span class="absolute top-0 right-0 block h-5 w-5 transform -translate-y-1/2 translate-x-1/2 rounded-full ring-2 ring-white dark:ring-gray-800 bg-red-500 text-white text-xs flex items-center justify-center">
+                                    {{ unread_notifications_count if unread_notifications_count <= 9 else '9+' }}
+                                </span>
+                            {% endif %}
+                        </a>
+                        {# Separador #}
+                        <div class="border-l border-gray-200 dark:border-gray-600 h-6"></div>
+                        {# Menú Usuario #}
+                        <div class="relative">
+                             <button type="button" class="flex items-center space-x-2 focus:outline-none" id="user-menu-button" aria-expanded="false" aria-haspopup="true">
+                                 <span class="hidden sm:inline text-sm text-gray-700 dark:text-gray-300">{{ current_user.username }}</span>
+                                 <div class="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center text-sm font-semibold text-blue-700 dark:text-blue-300">
+                                      {{ current_user.username[0]|upper if current_user.username else '?' }}
+                                 </div>
+                                 <i class="fas fa-chevron-down text-gray-500 dark:text-gray-400 text-xs"></i>
+                             </button>
+                             {# Menú Desplegable (inicialmente oculto) #}
+                             <div id="user-menu" class="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white dark:bg-gray-700 ring-1 ring-black ring-opacity-5 focus:outline-none hidden z-50" role="menu" aria-orientation="vertical" aria-labelledby="user-menu-button" tabindex="-1">
+                                 <div class="px-4 py-3">
+                                     <p class="text-sm">Sesión iniciada como</p>
+                                     <p class="text-sm font-medium text-gray-900 dark:text-white truncate">{{ current_user.username }}</p>
+                                      <p class="text-xs text-gray-500 dark:text-gray-400">{{ current_user.role|capitalize }}</p>
+                                 </div>
+                                 <div class="border-t border-gray-100 dark:border-gray-600"></div>
+                                 {# <a href="#" class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600" role="menuitem" tabindex="-1">Tu Perfil</a> #}
+                                 <a href="{{ url_for('auth_bp.logout') }}" class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600" role="menuitem" tabindex="-1">Cerrar Sesión</a>
+                             </div>
+                        </div>
+                    </div>
+                </div>
+            </header>
+        {% endif %} {# --- FIN current_user.is_authenticated para HEADER --- #}
+
+        {# --- MAIN AREA --- #}
+        <main class="flex-1 overflow-y-auto p-4 sm:p-6 {% if current_user.is_authenticated %}bg-gray-50 dark:bg-gray-900{% else %}bg-gray-100 dark:bg-gray-900{% endif %}">
+             {# Mensajes Flash #}
+             {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="mb-4 space-y-2">
+                    {% for category, message in messages %}
+                        {% set cat_map={'danger':'red','success':'green','warning':'yellow','info':'blue'} %}
+                        {% set c=cat_map.get(category, 'blue') %}
+                        <div class="bg-{{c}}-100 dark:bg-{{c}}-900/40 border-l-4 border-{{c}}-500 text-{{c}}-700 dark:text-{{c}}-300 p-3 rounded-md shadow-sm" role="alert">
+                            <div class="flex"><div class="py-1"><i class="fas {{ 'fa-check-circle' if category == 'success' else 'fa-info-circle' if category == 'info' else 'fa-exclamation-triangle' if category == 'warning' else 'fa-times-circle' }} mr-2"></i></div><div><p class="font-bold capitalize">{{ category if category != 'message' else 'Información' }}</p><p class="text-sm">{{ message|safe }}</p></div></div>
+                        </div>
+                    {% endfor %}
+                    </div>
+                {% endif %}
+             {% endwith %}
+             {# Contenido específico de la página hija #}
+            {% block content %}{% endblock %}
+        </main>
+        {# --- FIN MAIN AREA --- #}
+
+        {# --- FOOTER (Solo si está autenticado) --- #}
+        {% if current_user.is_authenticated %}
+            <footer class="bg-white dark:bg-gray-800 px-6 py-3 border-t border-gray-200 dark:border-gray-700 text-center text-xs text-gray-500 dark:text-gray-400 print:hidden flex-shrink-0">
+                © {{ now().year if now else '2024' }} RentalSys. Todos los derechos reservados. {# Añadido fallback para now() #}
+            </footer>
+        {% endif %}
+    </div>
+    {# --- FIN MAIN CONTENT --- #}
+</div>
+
+<!-- Container para Toast Notifications -->
+<div id="toastContainer" class="fixed top-4 right-4 z-50 space-y-2"></div>
+
+<!-- Modal de Importación Profesional -->
+<div id="importResultModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4 overflow-hidden">
+        <div id="modalHeader" class="bg-gradient-to-r from-green-500 to-green-600 px-6 py-4">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <div class="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+                        <i id="modalIcon" class="fas fa-check text-white text-xl"></i>
+                    </div>
+                </div>
+                <div class="ml-4">
+                    <h3 id="modalTitle" class="text-lg font-semibold text-white">Importación Completada</h3>
+                    <p id="modalSubtitle" class="text-green-100 text-sm">Operación realizada exitosamente</p>
+                </div>
+            </div>
+        </div>
+        <div class="px-6 py-4">
+            <div id="modalContent" class="mb-4">
+                <!-- El contenido se llena dinámicamente -->
+            </div>
+            <div id="modalMessage" class="text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/50 p-3 rounded-lg">
+                <i class="fas fa-info-circle mr-2"></i>
+                Los datos han sido importados correctamente al sistema.
+            </div>
+        </div>
+        <div class="bg-gray-50 dark:bg-gray-900/50 px-6 py-4 flex justify-end space-x-2">
+            <button onclick="closeImportModal()" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-green-500">
+                <i class="fas fa-check mr-2"></i>Entendido
+            </button>
+        </div>
+    </div>
+</div>
+
+
+{# --- SCRIPT GLOBAL LAYOUT --- #}
+<script>
+    // Seleccionar elementos solo si el usuario está autenticado (sidebar/header existen)
+    const sidebar = document.querySelector('.sidebar');
+    const mainArea = document.getElementById('mainContentArea');
+    const btnTgl = document.getElementById('toggleSidebar');
+    const userMenuButton = document.getElementById('user-menu-button');
+    const userMenu = document.getElementById('user-menu');
+    // Constantes
+    const LS_SIDEBAR_KEY = 'rentalsys_sidebar_collapsed';
+    const LS_DARKMODE_KEY = 'darkMode';
+    const SIDEBAR_COLLAPSED_WIDTH = '70px';
+    const SIDEBAR_EXPANDED_WIDTH = '250px';
+
+
+    // --- Funciones Globales ---
+    function setSidebarState(collapse) {
+        // Verificar si los elementos existen antes de usarlos
+        if (!sidebar || !mainArea) return;
+        sidebar.classList.toggle('sidebar-collapsed', collapse);
+        sidebar.classList.toggle('sidebar-expanded', !collapse);
+        mainArea.style.marginLeft = collapse ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_EXPANDED_WIDTH;
+        try { localStorage.setItem(LS_SIDEBAR_KEY, collapse ? 'true' : 'false'); } catch (e) { console.warn("LocalStorage no disponible para sidebar state");}
+    }
+
+    function toggleDarkMode() {
+        const htmlEl = document.documentElement;
+        const isDark = htmlEl.classList.toggle('dark');
+        try { localStorage.setItem(LS_DARKMODE_KEY, isDark); } catch (e) { console.warn("LocalStorage no disponible para dark mode");}
+        // Actualizar tema de gráficos si la función existe
+        if (typeof window.updateChartsTheme === 'function') {
+            window.updateChartsTheme(isDark);
+        }
+        // Actualizar el estado del toggle en Ajustes si existe
+        const darkModeToggle = document.getElementById('darkModeToggle');
+        if (darkModeToggle) { darkModeToggle.checked = isDark; }
+    }
+
+    function showModal(modalId) {
+        // console.log("Intentando mostrar modal:", modalId);
+        try {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.classList.remove('hidden');
+                // Dar un pequeño retardo antes de enfocar
+                setTimeout(() => {
+                    const firstInput = modal.querySelector('input:not([type=hidden]):not([readonly]):not(:disabled), select:not(:disabled), textarea:not(:disabled)');
+                    if (firstInput) {
+                        firstInput.focus();
+                        // console.log("Foco en:", firstInput);
+                    }
+                }, 100); // 100ms de retardo
+            } else {
+                console.error(`Modal con ID "${modalId}" no encontrado.`);
+            }
+        } catch (e) { console.error("Error en showModal:", e); }
+    }
+
+    function closeModal(modalId) {
+        // console.log("Intentando cerrar modal:", modalId);
+        try {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.classList.add('hidden');
+                // Limpiar errores específicos de formularios (si existen en ese modal)
+                const errorDivs = modal.querySelectorAll('[id$="ErrorMessages"]'); // Buscar IDs que terminen con ErrorMessages
+                errorDivs.forEach(div => div.textContent = '');
+            } else {
+                console.error(`Modal con ID "${modalId}" no encontrado al cerrar.`);
+            }
+        } catch (e) { console.error("Error en closeModal:", e); }
+    }
+
+    // Función global para confirmar borrado (requiere token CSRF)
+    function confirmDeleteWithToken(modalId, url, csrfToken) { // <--- NOMBRE CORRECTO
+        console.log("confirmDeleteWithToken llamado para:", modalId, url);
+        closeModal(modalId); // Cerrar el modal de confirmación
+
+        if (!csrfToken) {
+            console.error("Token CSRF no proporcionado a confirmDeleteWithToken.");
+            alert("Error de seguridad: Falta el token CSRF para la acción de eliminar.");
+            return;
+        }
+
+        try {
+            const form = document.createElement("form");
+            form.method = "POST";
+            form.action = url;
+
+            const csrfInput = document.createElement('input');
+            csrfInput.type = 'hidden';
+            csrfInput.name = 'csrf_token';
+            csrfInput.value = csrfToken;
+            form.appendChild(csrfInput);
+
+            document.body.appendChild(form);
+            console.log("Enviando formulario de eliminación con token...");
+            form.submit();
+        } catch (e) {
+            console.error("Error creando/enviando form de eliminación:", e);
+            alert("Ocurrió un error al intentar eliminar.");
+        }
+    }
+    // --- Event Listeners (Ejecutar cuando el DOM esté listo) ---
+    document.addEventListener('DOMContentLoaded', () => {
+        console.log("DOM Cargado. Configurando listeners...");
+
+        // Configurar Sidebar (solo si existe)
+        if (sidebar && btnTgl && mainArea) {
+             try {
+                 const initialCollapsed = localStorage.getItem(LS_SIDEBAR_KEY) === 'true';
+                 setSidebarState(initialCollapsed);
+                 btnTgl.addEventListener('click', () => {
+                     setSidebarState(sidebar.classList.contains('sidebar-expanded'));
+                 });
+             } catch(e) { console.error("Error configurando sidebar:", e); }
+        } else if (mainArea) {
+             // Asegurar margen si no hay sidebar (página login)
+             mainArea.style.marginLeft = '0px';
+        }
+
+        // Configurar Menú Usuario (solo si existe)
+        if (userMenuButton && userMenu) {
+            try {
+                userMenuButton.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    const isHidden = userMenu.classList.toggle('hidden');
+                    userMenuButton.setAttribute('aria-expanded', !isHidden);
+                });
+            } catch(e) { console.error("Error configurando botón menú usuario:", e); }
+        }
+
+        // Listener global para cerrar menú usuario y modales
+        document.addEventListener('click', (event) => {
+            // Cerrar menú usuario si se hace clic fuera
+            if (userMenuButton && userMenu && !userMenu.classList.contains('hidden')) {
+                if (!userMenuButton.contains(event.target) && !userMenu.contains(event.target)) {
+                    userMenu.classList.add('hidden');
+                    userMenuButton.setAttribute('aria-expanded', 'false');
+                }
+            }
+            // Cerrar modales si se hace clic en el overlay oscuro (primer hijo directo con la clase)
+            document.querySelectorAll('.fixed.inset-0.z-50:not(.hidden)').forEach(modal => {
+                 const overlay = modal.querySelector(':scope > .fixed.inset-0.transition-opacity');
+                 if (overlay && event.target === overlay) {
+                      closeModal(modal.id);
+                 }
+            });
+        });
+
+        // Listener global para cerrar menú usuario y modales con Escape
+        document.addEventListener('keydown', (event) => {
+            if (event.key === "Escape") {
+                // Cerrar menú usuario
+                if (userMenu && !userMenu.classList.contains('hidden')) {
+                     userMenu.classList.add('hidden');
+                     if(userMenuButton) userMenuButton.setAttribute('aria-expanded', 'false');
+                }
+                // Cerrar todos los modales abiertos
+                document.querySelectorAll('.fixed.inset-0.z-50:not(.hidden)').forEach(modal => {
+                    // Solo cerrar si el foco no está dentro del modal (o si está en body)
+                    if (!modal.contains(document.activeElement) || document.activeElement === document.body) {
+                       closeModal(modal.id);
+                    }
+                });
+            }
+        });
+
+        console.log("Listeners globales configurados.");
+    });
+	
+	// Función para eliminar flechas de TomSelect después de que se cree
+	function cleanTomSelectArrows() {
+		document.querySelectorAll('.ts-wrapper .ts-control').forEach(control => {
+			// Buscar y eliminar cualquier elemento que no sea nuestro icono o flecha personalizada
+			const children = Array.from(control.children);
+			children.forEach(child => {
+				// Si no es input, ni nuestro icono (.fas), ni nuestra flecha (.dropdown-arrow)
+				if (child.tagName !== 'INPUT' && 
+					!child.classList.contains('fas') && 
+					!child.classList.contains('dropdown-arrow')) {
+					
+					// Verificar si parece ser una flecha por su estilo
+					const computedStyle = window.getComputedStyle(child);
+					if (computedStyle.borderLeftWidth || 
+						computedStyle.borderRightWidth || 
+						computedStyle.borderTopWidth || 
+						computedStyle.borderBottomWidth) {
+						child.style.display = 'none';
+					}
+				}
+			});
+		});
+	}
+	
+
+	// Toast Notification Simple
+	function showToastNotification(message, type = 'success', duration = 5000) {
+		const colors = {
+			success: { bg: 'border-green-500', icon: 'text-green-600', iconBg: 'bg-green-100 dark:bg-green-900/50', iconClass: 'fa-check' },
+			error: { bg: 'border-red-500', icon: 'text-red-600', iconBg: 'bg-red-100 dark:bg-red-900/50', iconClass: 'fa-times' },
+			warning: { bg: 'border-yellow-500', icon: 'text-yellow-600', iconBg: 'bg-yellow-100 dark:bg-yellow-900/50', iconClass: 'fa-exclamation-triangle' },
+			info: { bg: 'border-blue-500', icon: 'text-blue-600', iconBg: 'bg-blue-100 dark:bg-blue-900/50', iconClass: 'fa-info-circle' }
+		};
+		
+		const color = colors[type] || colors.success;
+		
+		const toast = document.createElement('div');
+		toast.className = `notification-enter bg-white dark:bg-gray-800 ${color.bg} border-l-4 shadow-lg rounded-lg p-4 max-w-sm`;
+		toast.innerHTML = `
+			<div class="flex items-start">
+				<div class="flex-shrink-0">
+					<div class="w-8 h-8 ${color.iconBg} rounded-full flex items-center justify-center">
+						<i class="fas ${color.iconClass} ${color.icon}"></i>
+					</div>
+				</div>
+				<div class="ml-3 flex-1">
+					<p class="text-sm text-gray-900 dark:text-white">${message}</p>
+					<div class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+						<i class="fas fa-clock mr-1"></i>Hace un momento
+					</div>
+				</div>
+				<button onclick="removeToast(this)" class="ml-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+					<i class="fas fa-times"></i>
+				</button>
+			</div>
+		`;
+		
+		const container = document.getElementById('toastContainer');
+		if (container) {
+			container.appendChild(toast);
+			
+			// Auto-remove
+			setTimeout(() => {
+				if (toast.parentNode) {
+					removeToast(toast.querySelector('button'));
+				}
+			}, duration);
+		}
+	}
+
+	function removeToast(button) {
+		const toast = button.closest('.notification-enter');
+		if (toast) {
+			toast.className = toast.className.replace('notification-enter', 'notification-exit');
+			setTimeout(() => {
+				if (toast.parentNode) {
+					toast.parentNode.removeChild(toast);
+				}
+			}, 300);
+		}
+	}
+
+	// Modal de Resultado de Importación
+	function showImportResult(propiedades, inquilinos, type = 'success') {
+		const modal = document.getElementById('importResultModal');
+		if (!modal) return;
+		
+		const header = document.getElementById('modalHeader');
+		const icon = document.getElementById('modalIcon');
+		const title = document.getElementById('modalTitle');
+		const subtitle = document.getElementById('modalSubtitle');
+		const content = document.getElementById('modalContent');
+		
+		// Configurar colores según el tipo
+		if (type === 'success') {
+			header.className = 'bg-gradient-to-r from-green-500 to-green-600 px-6 py-4';
+			icon.className = 'fas fa-check text-white text-xl';
+			title.textContent = 'Importación Completada';
+			subtitle.textContent = 'Operación realizada exitosamente';
+		} else if (type === 'error') {
+			header.className = 'bg-gradient-to-r from-red-500 to-red-600 px-6 py-4';
+			icon.className = 'fas fa-times text-white text-xl';
+			title.textContent = 'Error en Importación';
+			subtitle.textContent = 'Se produjo un error durante la operación';
+		}
+		
+		// Contenido del modal
+		content.innerHTML = `
+			<div class="flex items-center mb-2">
+				<i class="fas fa-home text-green-600 dark:text-green-400 mr-3"></i>
+				<span class="text-gray-700 dark:text-gray-300">Propiedades creadas:</span>
+				<span class="ml-auto font-semibold text-green-600 dark:text-green-400">${propiedades}</span>
+			</div>
+			<div class="flex items-center mb-2">
+				<i class="fas fa-users text-blue-600 dark:text-blue-400 mr-3"></i>
+				<span class="text-gray-700 dark:text-gray-300">Inquilinos creados:</span>
+				<span class="ml-auto font-semibold text-blue-600 dark:text-blue-400">${inquilinos}</span>
+			</div>
+		`;
+		
+		// Mostrar modal
+		modal.classList.remove('hidden');
+		modal.classList.add('flex');
+		modal.querySelector('.bg-white').classList.add('modal-enter');
+	}
+
+	function closeImportModal() {
+		const modal = document.getElementById('importResultModal');
+		if (!modal) return;
+		
+		const content = modal.querySelector('.bg-white');
+		content.classList.remove('modal-enter');
+		content.classList.add('modal-exit');
+		setTimeout(() => {
+			modal.classList.add('hidden');
+			modal.classList.remove('flex');
+			content.classList.remove('modal-exit');
+		}, 300);
+	}
+
+	// Función mejorada para mensajes flash globales
+	window.showProfessionalFlashMessage = function(message, category = 'success') {
+		showToastNotification(message, category);
+	};
+
+	// Función específica para resultados de importación
+	window.showImportSuccess = function(propiedades, inquilinos) {
+		showImportResult(propiedades, inquilinos, 'success');
+	};
+
+	window.showImportError = function(message) {
+		showToastNotification(message, 'error', 8000);
+	};
+	
+	
+</script>
+
+{# --- Bloque para scripts específicos de cada página --- #}
+{% block scripts %}{% endblock %}
+
+</body>
+</html>

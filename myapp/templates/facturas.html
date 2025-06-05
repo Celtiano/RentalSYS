@@ -1,0 +1,1029 @@
+{% extends 'base.html' %}
+
+{% block title %}Facturas - RentalSys{% endblock %}
+{% block header_title %}Facturas{% endblock %}
+
+{% block content %}
+{# Contenedor principal con altura completa #}
+
+<div class="flex flex-col h-full">
+    {# Sección fija superior #}
+    <div class="flex-shrink-0">
+        {# Encabezado y botones #}
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+            <h2 class="text-2xl font-semibold text-gray-800 dark:text-gray-100 mb-4 md:mb-0">Gestión de Facturas</h2>
+            <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+                <button onclick="showCreateInvoiceModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md flex items-center focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                    <i class="fas fa-plus mr-2"></i> Nueva Factura Manual
+                </button>
+                <div class="relative">
+                    <input type="text" id="invoiceSearch" placeholder="Buscar..." class="form-input pl-10 pr-4 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 focus:border-blue-500 focus:ring-blue-500" onkeyup="applyFilters()">
+                    <div class="absolute left-3 top-2.5 text-gray-400"><i class="fas fa-search"></i></div>
+                </div>
+            </div>
+        </div>
+
+        {# Filtros #}
+        <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow mb-6">
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-x-4 gap-y-2 items-end">
+                {# Filtro Propietario #}
+                <div>
+                    <label for="filterOwner" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Propietario</label>
+                    <select id="filterOwner" class="form-input w-full text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200" onchange="applyFilters()">
+                        <option value="all">Todos</option>
+                        {% for owner in propietarios %}
+                        <option value="{{ owner.id }}">{{ owner.nombre | truncate(30, True) }}</option>
+                        {% else %}
+                        <option value="" disabled>No hay propietarios</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                {# Filtro Inquilino #}
+                <div>
+                    <label for="filterTenant" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Inquilino</label>
+                    <select id="filterTenant" class="form-input w-full text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200" onchange="applyFilters()">
+                        <option value="all">Todos</option>
+                        {% for tenant in inquilinos %}
+                        <option value="{{ tenant.id }}">{{ tenant.nombre | truncate(30, True) }}</option>
+                        {% else %}
+                        <option value="" disabled>No hay inquilinos</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                {# Filtro Contrato #}
+                <div>
+                    <label for="filterContract" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Contrato</label>
+                    <select id="filterContract" class="form-input w-full text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200" onchange="applyFilters()">
+                        <option value="all">Todos</option>
+                        {% for contract in contratos %}
+                        <option value="{{ contract.id }}">
+                            {{ contract.numero_contrato }} ({{ contract.propiedad_ref.direccion | truncate(15, True) if contract.propiedad_ref else 'S/P' }})
+                        </option>
+                        {% else %}
+                        <option value="" disabled>No hay contratos</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                {# Filtro Año #}
+                <div>
+                    <label for="filterYear" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Año Emisión</label>
+                    <select id="filterYear" class="form-input w-full text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200" onchange="applyFilters()">
+                        <option value="all">Todos</option>
+                        {% set current_year = now().year %}
+                        {% for year in range(current_year + 1, current_year - 5, -1) %}
+                            <option value="{{ year }}">{{ year }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                {# Filtro Mes #}
+                <div>
+                    <label for="filterMonth" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Mes Emisión</label>
+                    <select id="filterMonth" class="form-input w-full text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200" onchange="applyFilters()">
+                        <option value="all">Todos</option>
+                        {% set current_month = now().month %}
+                        {% for i in range(1, 13) %}
+                        <option value="{{ i }}"> 
+                            {{ ["", "Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"][i] }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        {# Contador y Botones de Vista #}
+        <div class="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-2 sm:space-y-0">
+            <div class="text-sm text-gray-500 dark:text-gray-400">
+                Mostrando <span id="visibleCount" class="font-medium">{{ facturas|length }}</span> de <span id="totalCount" class="font-medium">{{ facturas|length }}</span> facturas
+            </div>
+            <div class="inline-flex rounded-md shadow-sm self-end sm:self-center">
+                <button id="tableViewBtn" onclick="toggleView('table')" class="px-4 py-2 text-sm font-medium rounded-l-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-600 focus:z-10 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                    <i class="fas fa-table mr-2"></i><span class="hidden sm:inline">Tabla</span>
+                </button>
+                <button id="cardViewBtn" onclick="toggleView('card')" class="px-4 py-2 text-sm font-medium rounded-r-lg border border-gray-200 dark:border-gray-600 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:z-10 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                    <i class="fas fa-th-large mr-2"></i><span class="hidden sm:inline">Tarjetas</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    {# Contenedor scrolleable para tabla y tarjetas #}
+    <div class="flex-grow overflow-y-auto" style="height: calc(100vh - 400px);">
+        <!-- Vista Tabla -->
+        <div id="tableView" class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                    <thead class="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
+                        <tr>
+                            <th class="px-6 py-1.5 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">N° Factura</th>
+                            <th class="px-6 py-1.5 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Inquilino</th>
+                            <th class="px-6 py-1.5 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Propiedad</th>
+                            <th class="px-6 py-1.5 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Emisión</th>
+                            <th class="px-6 py-1.5 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Total</th>
+                            <th class="px-6 py-1.5 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Estado</th>
+                            <th class="px-6 py-1.5 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="invoicesTable" class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                        {% if facturas %}
+                            {% for invoice in facturas %}
+                            <tr class="highlight-row invoice-row"
+                                data-id="{{ invoice.id }}"
+                                data-numero="{{ invoice.numero_factura | e }}"
+                                data-inquilino-id="{{ invoice.inquilino_id }}"
+                                data-propiedad-id="{{ invoice.propiedad_id }}"
+                                data-propietario-id="{{ invoice.propiedad_ref.propietario_id if invoice.propiedad_ref else '' }}"
+                                data-contrato-id="{{ invoice.contrato_id }}"
+                                data-fecha-emision="{{ invoice.fecha_emision.isoformat() if invoice.fecha_emision else '' }}"
+                                data-total="{{ invoice.total }}"
+                                data-estado="{{ invoice.estado }}"
+                                data-month="{{ invoice.fecha_emision.month if invoice.fecha_emision else '' }}"
+                                data-year="{{ invoice.fecha_emision.year if invoice.fecha_emision else '' }}"
+                                data-search-text="{{ invoice.numero_factura | lower }} {{ invoice.inquilino_ref.nombre | lower if invoice.inquilino_ref else '' }} {{ invoice.propiedad_ref.direccion | lower if invoice.propiedad_ref else '' }} {{ invoice.notas | lower if invoice.notas else '' }}"
+                                data-inquilino="{{ invoice.inquilino_ref.nombre | default('N/A', true) | e }}"
+                                data-propiedad-dir="{{ invoice.propiedad_ref.direccion | default('N/A', true) | e }}"
+                                data-notas="{{ invoice.notas | default('', true) | e }}"
+                                data-items-json="{{ invoice.items_json | default('[]') | e }}"
+                                data-subtotal-original="{{ invoice.subtotal }}"
+                                data-iva-original="{{ invoice.iva }}"
+                                data-irpf-original="{{ invoice.irpf }}"
+                                data-total-original="{{ invoice.total }}"
+                                data-aplicar-iva="{{ 'true' if invoice.iva > 0 else 'false' }}"
+                                data-aplicar-irpf="{{ 'true' if invoice.irpf > 0 else 'false' }}"
+                                data-iva-aplicado="{{ invoice.iva_rate_applied if invoice.iva_rate_applied is not none else (IVA_RATE if invoice.iva > 0 else 0) }}"
+                                data-irpf-aplicado="{{ invoice.irpf_rate_applied if invoice.irpf_rate_applied is not none else (IRPF_RATE if invoice.irpf > 0 else 0) }}"
+                                >
+                                <td class="px-6 py-1 whitespace-nowrap">
+                                    <a href="{{ url_for('facturas_bp.ver_factura', id=invoice.id) }}" class="text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 hover:underline" title="Ver detalles">{{ invoice.numero_factura }}</a>
+                                </td>
+                                <td class="px-6 py-1 whitespace-nowrap">
+                                    <div class="text-sm font-medium text-gray-900 dark:text-white" title="{{ invoice.inquilino_ref.nif | default('', true) }}">
+                                        {{ invoice.inquilino_ref.nombre if invoice.inquilino_ref else 'N/A' }}
+                                    </div>
+                                </td>
+                                <td class="px-6 py-1 whitespace-nowrap">
+                                    <div class="text-sm text-gray-500 dark:text-gray-300 truncate" title="{{ invoice.propiedad_ref.direccion if invoice.propiedad_ref else 'N/A' }}">
+                                        {{ invoice.propiedad_ref.direccion | truncate(30, True) if invoice.propiedad_ref else 'N/A' }}
+                                    </div>
+                                </td>
+                                <td class="px-6 py-1 whitespace-nowrap">
+                                    <div class="text-sm text-gray-500 dark:text-gray-300">
+                                        {{ invoice.fecha_emision | date if invoice.fecha_emision else 'N/A' }}
+                                    </div>
+                                </td>
+                                <td class="px-6 py-1 whitespace-nowrap">
+                                    <div class="text-sm font-medium text-gray-900 dark:text-white">
+                                        {{ invoice.total | currency if invoice.total is not none else 'N/A' }}
+                                    </div>
+                                </td>
+                                <td class="px-6 py-1 whitespace-nowrap">
+                                    {% if invoice.estado == 'pagada' %}
+                                        <span class="status-badge status-paid">Pagada</span>
+                                    {% elif invoice.estado == 'pendiente' %}
+                                        <span class="status-badge status-pending">Pendiente</span>
+                                    {% elif invoice.estado == 'cancelada' %}
+                                        <span class="status-badge status-cancelada">Cancelada</span>
+                                    {% else %}
+                                        <span class="status-badge bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200">
+                                            {{ invoice.estado | capitalize }}
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-1">
+                                    {% if invoice.estado == 'pendiente' %}
+                                    <form action="{{ url_for('facturas_bp.mark_as_paid', id=invoice.id) }}" method="POST" class="inline-block">
+										{{ csrf_form.csrf_token }}
+                                        <button type="submit" class="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300" title="Marcar Pagada">
+                                            <i class="fas fa-check-circle"></i>
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                    <a href="{{ url_for('facturas_bp.ver_factura', id=invoice.id) }}" class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300" title="Ver">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <a href="{{ url_for('facturas_bp.download_factura', id=invoice.id) }}" class="text-purple-600 hover:text-purple-900 dark:text-purple-400 dark:hover:text-purple-300" title="Descargar PDF">
+                                        <i class="fas fa-download"></i>
+                                    </a>
+                                    <form action="{{ url_for('facturas_bp.send_invoice_email', id=invoice.id) }}" method="POST" class="inline-block" onsubmit="this.querySelector('button').disabled=true; this.querySelector('button').innerHTML='<i class=\'fas fa-spinner fa-spin\'></i>';">
+                                        {{ csrf_form.csrf_token }}
+                                        <button type="submit" class="text-teal-600 hover:text-teal-900 dark:text-teal-400 dark:hover:text-teal-300" title="Enviar por Email">
+                                            <i class="fas fa-paper-plane"></i>
+                                        </button>
+                                    </form>
+                                    {% if invoice.estado != 'cancelada' %}
+                                        <button onclick="editInvoice(this)" class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300" title="Editar">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                    {% else %}
+                                        <button class="text-gray-400 dark:text-gray-500 cursor-not-allowed" title="No editable" disabled>
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                    {% endif %}
+                                    {% if invoice.estado != 'cancelada' %}
+                                        <button onclick="deleteInvoice({{ invoice.id }})" class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300" title="Eliminar">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    {% else %}
+                                        <button class="text-gray-400 dark:text-gray-500 cursor-not-allowed" title="No eliminable" disabled>
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                            <tr id="no-filtered-invoices-row" style="display: none;">
+                                <td colspan="7" class="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400 italic">
+                                    No hay facturas que coincidan con los filtros aplicados.
+                                </td>
+                            </tr>
+                        {% else %}
+                            <tr id="no-invoices-row">
+                                <td colspan="7" class="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
+                                    No hay facturas registradas.
+                                </td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Vista Tarjetas -->
+        <div id="cardView" class="hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {% if facturas %}
+                {% for invoice in facturas %}
+                <div class="invoice-card bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden transition duration-300 ease-in-out invoice-row"
+                     data-id="{{ invoice.id }}"
+                     data-numero="{{ invoice.numero_factura | e }}"
+                     data-inquilino-id="{{ invoice.inquilino_id }}"
+                     data-propiedad-id="{{ invoice.propiedad_id }}"
+                     data-propietario-id="{{ invoice.propiedad_ref.propietario_id if invoice.propiedad_ref else '' }}"
+                     data-contrato-id="{{ invoice.contrato_id }}"
+                     data-fecha-emision="{{ invoice.fecha_emision.isoformat() if invoice.fecha_emision else '' }}"
+                     data-total="{{ invoice.total }}"
+                     data-estado="{{ invoice.estado }}"
+                     data-month="{{ invoice.fecha_emision.month if invoice.fecha_emision else '' }}"
+                     data-year="{{ invoice.fecha_emision.year if invoice.fecha_emision else '' }}"
+                     data-search-text="{{ invoice.numero_factura | lower }} {{ invoice.inquilino_ref.nombre | lower if invoice.inquilino_ref else '' }} {{ invoice.propiedad_ref.direccion | lower if invoice.propiedad_ref else '' }} {{ invoice.notas | lower if invoice.notas else '' }}"
+                     data-inquilino="{{ invoice.inquilino_ref.nombre | default('N/A', true) | e }}"
+                     data-propiedad-dir="{{ invoice.propiedad_ref.direccion | default('N/A', true) | e }}"
+                     data-notas="{{ invoice.notas | default('', true) | e }}"
+                     data-items-json="{{ invoice.items_json | default('[]') | e }}"
+                     data-aplicar-iva="{{ 'true' if invoice.contrato_ref and invoice.contrato_ref.aplicar_iva else 'false' }}"
+                     data-aplicar-irpf="{{ 'true' if invoice.contrato_ref and invoice.contrato_ref.aplicar_irpf else 'false' }}"
+                     data-iva-aplicado="{{ invoice.iva_rate_applied if invoice.iva_rate_applied is not none else (IVA_RATE if invoice.iva > 0 else 0) }}"
+                     data-irpf-aplicado="{{ invoice.irpf_rate_applied if invoice.irpf_rate_applied is not none else (IRPF_RATE if invoice.irpf > 0 else 0) }}"
+                     >
+                    <div class="p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50">
+                        <div class="flex justify-between items-center">
+                            <a href="{{ url_for('facturas_bp.ver_factura', id=invoice.id) }}" class="text-lg font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline" title="Ver detalles">{{ invoice.numero_factura }}</a>
+                            {% if invoice.estado == 'pagada' %}
+                                <span class="status-badge status-paid">Pagada</span>
+                            {% elif invoice.estado == 'pendiente' %}
+                                <span class="status-badge status-pending">Pendiente</span>
+                            {% elif invoice.estado == 'cancelada' %}
+                                <span class="status-badge status-cancelada">Cancelada</span>
+                            {% else %}
+                                <span class="status-badge bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200">{{ invoice.estado | capitalize }}</span>
+                            {% endif %}
+                        </div>
+                        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                            Emitida: {{ invoice.fecha_emision | date if invoice.fecha_emision else 'N/A' }}
+                        </p>
+                    </div>
+                    <div class="p-4">
+                        <div class="mb-3">
+                            <p class="text-sm text-gray-500 dark:text-gray-400">Inquilino</p>
+                            <p class="text-sm font-medium text-gray-900 dark:text-white truncate" title="{{ invoice.inquilino_ref.nombre if invoice.inquilino_ref else 'N/A' }}">
+                                {{ invoice.inquilino_ref.nombre if invoice.inquilino_ref else 'N/A' }}
+                            </p>
+                        </div>
+                        <div class="mb-4">
+                            <p class="text-sm text-gray-500 dark:text-gray-400">Propiedad</p>
+                            <p class="text-sm font-medium text-gray-900 dark:text-white truncate" title="{{ invoice.propiedad_ref.direccion if invoice.propiedad_ref else 'N/A' }}">
+                                {{ invoice.propiedad_ref.direccion | truncate(40, True) if invoice.propiedad_ref else 'N/A' }}
+                            </p>
+                        </div>
+                        <div class="flex justify-between items-center pt-4 border-t border-gray-200 dark:border-gray-700">
+                            <div>
+                                <p class="text-sm text-gray-500 dark:text-gray-400">Total</p>
+                                <p class="text-lg font-bold text-gray-900 dark:text-white">
+                                    {{ invoice.total | currency }}
+                                </p>
+                            </div>
+                            <div class="flex space-x-1">
+                                {% if invoice.estado == 'pendiente' %}
+                                <form action="{{ url_for('facturas_bp.mark_as_paid', id=invoice.id) }}" method="POST" class="inline-block">
+                                    {{ csrf_form.csrf_token }}
+									<button type="submit" class="p-2 rounded-full bg-green-100 text-green-600 hover:bg-green-200 dark:bg-green-900/50 dark:text-green-300 dark:hover:bg-green-800/50 focus:outline-none focus:ring-2 focus:ring-green-500" title="Marcar Pagada">
+                                        <i class="fas fa-check-circle fa-fw"></i>
+                                    </button>
+                                </form>
+                                {% endif %}
+                                <a href="{{ url_for('facturas_bp.ver_factura', id=invoice.id) }}" class="p-2 rounded-full bg-indigo-100 text-indigo-600 hover:bg-indigo-200 dark:bg-indigo-900/50 dark:text-indigo-300 dark:hover:bg-indigo-800/50 focus:outline-none focus:ring-2 focus:ring-indigo-500" title="Ver">
+                                    <i class="fas fa-eye fa-fw"></i>
+                                </a>
+                                <a href="{{ url_for('facturas_bp.download_factura', id=invoice.id) }}" class="p-2 rounded-full bg-purple-100 text-purple-600 hover:bg-purple-200 dark:bg-purple-900/50 dark:text-purple-300 dark:hover:bg-purple-800/50 focus:outline-none focus:ring-2 focus:ring-purple-500" title="Descargar PDF">
+                                    <i class="fas fa-download fa-fw"></i>
+                                </a>
+                                <form action="{{ url_for('facturas_bp.send_invoice_email', id=invoice.id) }}" method="POST" class="inline-block" onsubmit="this.querySelector('button').disabled=true; this.querySelector('button i').classList.add('fa-spinner', 'fa-spin'); this.querySelector('button i').classList.remove('fa-paper-plane');">
+                                     {{ csrf_form.csrf_token }}
+                                     <button type="submit" class="p-2 rounded-full bg-teal-100 text-teal-600 hover:bg-teal-200 dark:bg-teal-900/50 dark:text-teal-300 dark:hover:bg-teal-800/50 focus:outline-none focus:ring-2 focus:ring-teal-500" title="Enviar por Email">
+                                         <i class="fas fa-paper-plane fa-fw"></i>
+                                     </button>
+                                </form>
+                                {% if invoice.estado != 'cancelada' %}
+                                    <button onclick="editInvoice(this)" class="p-2 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 dark:bg-blue-900/50 dark:text-blue-300 dark:hover:bg-blue-800/50 focus:outline-none focus:ring-2 focus:ring-blue-500" title="Editar">
+                                        <i class="fas fa-edit fa-fw"></i>
+                                    </button>
+                                {% endif %}
+                                {% if invoice.estado != 'cancelada' %}
+                                    <button onclick="deleteInvoice({{ invoice.id }})" class="p-2 rounded-full bg-red-100 text-red-600 hover:bg-red-200 dark:bg-red-900/50 dark:text-red-300 dark:hover:bg-red-800/50 focus:outline-none focus:ring-2 focus:ring-red-500" title="Eliminar">
+                                        <i class="fas fa-trash fa-fw"></i>
+                                    </button>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+                <div id="no-filtered-invoices-card" class="hidden sm:col-span-2 md:col-span-3 text-center text-gray-500 dark:text-gray-400 mt-6 p-4 border dark:border-gray-700 rounded-md italic">
+                    No hay facturas que coincidan con los filtros aplicados.
+                </div>
+            {% else %}
+                <p id="no-invoices-card" class="sm:col-span-2 md:col-span-3 text-center text-gray-500 dark:text-gray-400 mt-4">
+                    No hay facturas para mostrar.
+                </p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- ====== Modales ====== -->
+
+<!-- Modal: Crear Factura Manual -->
+<div id="createInvoiceModal" class="fixed inset-0 overflow-y-auto hidden z-50">
+    <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div class="fixed inset-0 transition-opacity" aria-hidden="true"><div class="absolute inset-0 bg-gray-500 opacity-75"></div></div>
+        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">​</span>
+        <div class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
+            <form id="createInvoiceForm" action="{{ url_for('facturas_bp.add_factura') }}" method="POST" onsubmit="return validateInvoiceForm()">
+                {{ csrf_form.csrf_token }}
+				<div class="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white mb-4">Nueva Factura Manual</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                            <label for="invoiceTenant" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Inquilino <span class="text-red-500">*</span></label>
+                            <select id="invoiceTenant" name="invoiceTenant" required class="form-input w-full dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200">
+                                <option value="">Seleccionar...</option>
+                                {% for tenant in inquilinos %}
+                                <option value="{{ tenant.id }}">{{ tenant.nombre }} ({{ tenant.nif }})</option>
+                                {% else %}
+                                <option value="" disabled>No hay inquilinos</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label for="invoiceProperty" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Propiedad <span class="text-red-500">*</span></label>
+                            <select id="invoiceProperty" name="invoiceProperty" required class="form-input w-full dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200">
+                                <option value="">Seleccionar...</option>
+                                {% for prop in propiedades %}
+                                <option value="{{ prop.id }}">{{ prop.direccion }}</option>
+                                {% else %}
+                                <option value="" disabled>No hay propiedades</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label for="invoiceDate" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Fecha Emisión <span class="text-red-500">*</span></label>
+                            <input type="date" id="invoiceDate" name="invoiceDate" required class="form-input w-full dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200" value="{{ today_date or '' }}">
+                        </div>
+                    </div>
+                    <div class="mt-6">
+                        <h4 class="text-md font-medium text-gray-900 dark:text-white mb-2">Conceptos</h4>
+                        <div class="overflow-x-auto border rounded-md dark:border-gray-600">
+                            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                                <thead class="bg-gray-50 dark:bg-gray-700">
+                                    <tr>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Descripción <span class="text-red-500">*</span></th>
+                                        <th class="px-4 py-2 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-24">Cantidad <span class="text-red-500">*</span></th>
+                                        <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-32">Precio Unit. (€) <span class="text-red-500">*</span></th>
+                                        <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-32">Total (€)</th>
+                                        <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-12"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="invoiceItems" class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                                    {# Las filas se añaden con JS #}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="mt-2 flex justify-between items-center">
+                            <button type="button" onclick="addItem()" class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-sm font-medium focus:outline-none"><i class="fas fa-plus mr-1"></i> Añadir concepto</button>
+                            <div id="formErrorMessages" class="text-red-600 dark:text-red-400 text-sm font-medium"></div>
+                        </div>
+                    </div>
+                    <div class="mt-6 grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div class="md:col-span-2">
+                            <label for="invoiceNotes" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Notas</label>
+                            <textarea id="invoiceNotes" name="invoiceNotes" rows="4" class="form-input w-full dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200" placeholder="Información adicional..."></textarea>
+                        </div>
+                        <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-md border dark:border-gray-600 space-y-1">
+                            <div class="flex justify-between text-sm"><span class="text-gray-600 dark:text-gray-300">Subtotal:</span><span id="invoiceSubtotal" class="font-medium text-gray-900 dark:text-white">0,00 €</span></div>
+                            <div class="flex justify-between text-sm"><span class="text-gray-600 dark:text-gray-300">IVA ({{ (g.settings.iva_rate * 100) | round(2) if g and g.settings else (0.21 * 100) | round(2) }}%):</span><span id="invoiceIVA" class="font-medium text-gray-900 dark:text-white">0,00 €</span></div>
+                            <div class="flex justify-between text-sm text-red-700 dark:text-red-400"><span class="text-red-600 dark:text-red-400">IRPF ({{ (IRPF_RATE * 100) | round(2) }}%):</span><span id="invoiceIRPF" class="font-medium">- 0,00 €</span></div>
+                            <div class="flex justify-between pt-2 border-t border-gray-300 dark:border-gray-600 mt-2 text-base"><span class="font-semibold text-gray-900 dark:text-white">Total:</span><span id="invoiceTotal" class="font-bold text-gray-900 dark:text-white">0,00 €</span></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button type="submit" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm">Guardar factura</button>
+                    <button type="button" onclick="closeModal('createInvoiceModal')" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-800 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Editar Factura -->
+<div id="editInvoiceModal" class="fixed inset-0 overflow-y-auto hidden z-50 
+                                 flex items-center justify-center"> {# <--- CLASES CLAVE AQUÍ #}
+    {# Backdrop/Overlay con un div separado para que el clic fuera funcione bien #}
+    <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity modal-overlay-general" aria-hidden="true"></div>
+
+    {# Contenedor del contenido del modal, para transiciones y tamaño máximo #}
+    <div class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left 
+                overflow-hidden shadow-xl transform transition-all 
+                sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full
+                max-h-[90vh] flex flex-col"> {# <--- max-h y flex-col para scroll interno #}
+
+        <form id="editInvoiceForm" action="" method="POST" onsubmit="return prepareEditInvoiceData();" class="flex flex-col flex-grow">
+            {{ csrf_form.csrf_token }}
+            <input type="hidden" name="editItemsJson" id="editItemsJson">
+
+            {# Header del Modal #}
+            <div class="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4 border-b dark:border-gray-700 flex-shrink-0">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white">
+                        Editar Factura <span id="editInvoiceNumberDisplay" class="text-base text-blue-600 dark:text-blue-400 ml-2"></span>
+                    </h3>
+                    <button type="button" onclick="closeModal('editInvoiceModal')" class="text-gray-400 hover:text-gray-500 dark:text-gray-500 dark:hover:text-gray-400">
+                        <span class="sr-only">Cerrar</span>
+                        <i class="fas fa-times h-6 w-6"></i>
+                    </button>
+                </div>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Fecha emisión: <span id="editInvoiceIssueDateDisplay"></span></p>
+            </div>
+
+            {# Body del Modal (CON SCROLL INTERNO) #}
+            <div class="px-4 sm:px-6 py-4 flex-grow overflow-y-auto"> {# <--- flex-grow y overflow-y-auto AQUÍ #}
+                {# ... Contenido del formulario: Conceptos, Notas, Totales ... #}
+                {# (Igual que antes) #}
+                 <div class="mt-6">
+                    <h4 class="text-md font-medium text-gray-900 dark:text-white mb-2">Conceptos</h4>
+                    <div class="overflow-x-auto border rounded-md dark:border-gray-600">
+                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                            <thead class="bg-gray-50 dark:bg-gray-700">
+                                <tr>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Descripción <span class="text-red-500">*</span></th>
+                                    <th class="px-4 py-2 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-24">Cantidad <span class="text-red-500">*</span></th>
+                                    <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-32">Precio Unit. (€) <span class="text-red-500">*</span></th>
+                                    <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-32">Total (€)</th>
+                                    <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-12"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="editInvoiceItems" class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700"></tbody>
+                        </table>
+                    </div>
+                    <div class="mt-2 flex justify-between items-center">
+                        <button type="button" onclick="addEditItem()" class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-sm font-medium focus:outline-none"><i class="fas fa-plus mr-1"></i> Añadir concepto</button>
+                        <div id="editFormErrorMessages" class="text-red-600 dark:text-red-400 text-sm font-medium"></div>
+                    </div>
+                </div>
+                <div class="mt-6 grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div class="md:col-span-2">
+                        <label for="editInvoiceNotes" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Notas</label>
+                        <textarea id="editInvoiceNotes" name="editInvoiceNotes" rows="4" class="form-input w-full dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"></textarea>
+                    </div>
+                    <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-md border dark:border-gray-600 space-y-1">
+                        <div class="flex justify-between text-sm"><span class="text-gray-600 dark:text-gray-300">Subtotal:</span><span id="editInvoiceSubtotal" class="font-medium text-gray-900 dark:text-white">0,00 €</span></div>
+                        <div class="flex justify-between text-sm"><span class="text-gray-600 dark:text-gray-300">IVA (<span id="editInvoiceIvaRatePercent">0.00</span>%):</span><span id="editInvoiceIVA" class="font-medium text-gray-900 dark:text-white">0,00 €</span></div>
+                        <div class="flex justify-between text-sm text-red-700 dark:text-red-400"><span class="text-red-600 dark:text-red-400">IRPF (<span id="editInvoiceIrpfRatePercent">0.00</span>%):</span><span id="editInvoiceIRPF" class="font-medium">- 0,00 €</span></div>
+                        <div class="flex justify-between pt-2 border-t border-gray-300 dark:border-gray-600 mt-2 text-base"><span class="font-semibold text-gray-900 dark:text-white">Total:</span><span id="editInvoiceTotal" class="font-bold text-gray-900 dark:text-white">0,00 €</span></div>
+                    </div>
+                </div>
+            </div>
+
+            {# Footer del Modal (con botones) #}
+            <div class="bg-gray-50 dark:bg-gray-700/50 px-4 py-3 sm:px-6 flex-shrink-0 border-t dark:border-gray-700">
+                <div class="flex justify-end space-x-3">
+                    <button type="button" onclick="closeModal('editInvoiceModal')" 
+                            class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md hover:bg-gray-50 dark:hover:bg-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-800">
+                        Cancelar
+                    </button>
+                    <button type="submit" 
+                            class="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 border border-transparent rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-800">
+                        Guardar Cambios
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Confirmar Eliminación -->
+<div id="deleteInvoiceModal" class="fixed inset-0 overflow-y-auto hidden z-50 
+                                 flex items-center justify-center p-4"> {# <--- CLASES CLAVE AQUÍ y p-4 para margen #}
+    
+    {# Backdrop/Overlay #}
+    <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity modal-overlay-general" 
+         aria-hidden="true" onclick="closeModal('deleteInvoiceModal')"></div> {# Opcional: cerrar al hacer clic en overlay #}
+
+    {# Contenedor del contenido del modal #}
+    <div class="relative inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left 
+                overflow-hidden shadow-xl transform transition-all 
+                sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+        
+        {# Encabezado del Modal (opcional pero recomendado) #}
+        <div class="bg-white dark:bg-gray-800 px-4 pt-5 sm:p-6">
+            <div class="sm:flex sm:items-start">
+                <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 dark:bg-red-900/30 sm:mx-0 sm:h-10 sm:w-10">
+                    <i class="fas fa-exclamation-triangle text-red-600 dark:text-red-400"></i>
+                </div>
+                <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white" id="modal-title">
+                        Eliminar Factura
+                    </h3>
+                    <div class="mt-2">
+                        <p class="text-sm text-gray-500 dark:text-gray-400">
+                            ¿Seguro que deseas eliminar la factura 
+                            <strong id="deleteInvoiceNumberDisplay" class="text-gray-700 dark:text-gray-200"></strong>?
+                            Esta acción no se puede deshacer.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {# Fin Encabezado #}
+        
+        {# Footer con Botones #}
+        <div class="bg-gray-50 dark:bg-gray-700/50 px-4 py-3 sm:px-6 flex flex-col sm:flex-row-reverse gap-2">
+            <button id="confirmDeleteInvoiceButton" type="button" 
+                    class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm">
+                Eliminar
+            </button>
+            <button type="button" onclick="closeModal('deleteInvoiceModal')" 
+                    class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-800 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:w-auto sm:text-sm">
+                Cancelar
+            </button>
+        </div>
+        {# Fin Footer #}
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // --- ESTADO Y CONSTANTES GLOBALES ---
+    const uiState = {
+        currentView: localStorage.getItem('invoiceView') || 'table',
+        filters: { search: '', owner: 'all', tenant: 'all', contract: 'all', month: 'all', year: 'all' }
+    };
+    const IVA_RATE = parseFloat("{{ IVA_RATE | default(0.21) }}");
+    const IRPF_RATE = parseFloat("{{ IRPF_RATE | default(0.19) }}");
+    const currencyFormatOptions = { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 2 };
+    const localeString = 'es-ES';
+    const csrfTokenGlobal = "{{ csrf_form.csrf_token._value() }}"; // Token CSRF global
+
+    // --- FUNCIONES DE UTILIDAD MODAL (Definidas aquí para asegurar disponibilidad) ---
+    function showModal(id) {
+        const modal = document.getElementById(id);
+        if (modal) {
+            modal.classList.remove("hidden");
+            modal.classList.add("flex", "items-center", "justify-center");
+            const firstInput = modal.querySelector('input:not([type=hidden]):not([readonly]):not(:disabled), select:not(:disabled), textarea:not(:disabled)');
+            if (firstInput) setTimeout(() => firstInput.focus(), 60);
+        } else { console.error(`Modal con ID "${id}" no encontrado.`); }
+    }
+
+    function closeModal(id) {
+        const modal = document.getElementById(id);
+        if (modal) {
+            modal.classList.add("hidden");
+            modal.classList.remove("flex", "items-center", "justify-center");
+            const errorDivCreate = modal.querySelector('#formErrorMessages');
+            const errorDivEdit = modal.querySelector('#editFormErrorMessages');
+            if (errorDivCreate) errorDivCreate.innerHTML = ''; // Usar innerHTML para limpiar completamente
+            if (errorDivEdit) errorDivEdit.innerHTML = '';
+        } else { console.error(`Modal con ID "${id}" no encontrado al cerrar.`); }
+    }
+    
+    function confirmDeleteWithToken(modalId, url, csrfToken) {
+        closeModal(modalId);
+        if (!csrfToken) {
+            console.error("Token CSRF no proporcionado a confirmDeleteWithToken.");
+            alert("Error de seguridad: Falta el token CSRF."); return;
+        }
+        try {
+            const form = document.createElement("form");
+            form.method = "POST"; form.action = url;
+            const csrfInput = document.createElement('input');
+            csrfInput.type = 'hidden'; csrfInput.name = 'csrf_token'; csrfInput.value = csrfToken;
+            form.appendChild(csrfInput);
+            document.body.appendChild(form); form.submit();
+        } catch (e) { console.error("Error creando/enviando form de eliminación:", e); alert("Ocurrió un error al intentar eliminar.");}
+    }
+
+    // --- LÓGICA DE LA PÁGINA DE FACTURAS ---
+    function toggleView(view) {
+        const tableView = document.getElementById('tableView');
+        const cardView = document.getElementById('cardView');
+        const tableBtn = document.getElementById('tableViewBtn');
+        const cardBtn = document.getElementById('cardViewBtn');
+
+        if (!tableView || !cardView || !tableBtn || !cardBtn) {
+            console.error("toggleView: Elementos de vista no encontrados. Saliendo.");
+            return;
+        }
+        const isTable = view === 'table';
+        tableView.classList.toggle('hidden', !isTable);
+        cardView.classList.toggle('hidden', isTable);
+        tableBtn.classList.toggle('bg-white', isTable); tableBtn.classList.toggle('dark:bg-gray-700', isTable);
+        tableBtn.classList.toggle('text-blue-600', isTable); tableBtn.classList.toggle('dark:text-blue-400', isTable);
+        tableBtn.classList.toggle('bg-gray-100', !isTable); tableBtn.classList.toggle('dark:bg-gray-800', !isTable);
+        tableBtn.classList.toggle('text-gray-700', !isTable); tableBtn.classList.toggle('dark:text-gray-300', !isTable);
+        cardBtn.classList.toggle('bg-white', !isTable); cardBtn.classList.toggle('dark:bg-gray-700', !isTable);
+        cardBtn.classList.toggle('text-blue-600', !isTable); cardBtn.classList.toggle('dark:text-blue-400', !isTable);
+        cardBtn.classList.toggle('bg-gray-100', isTable); cardBtn.classList.toggle('dark:bg-gray-800', isTable);
+        cardBtn.classList.toggle('text-gray-700', isTable); cardBtn.classList.toggle('dark:text-gray-300', isTable);
+        uiState.currentView = view; localStorage.setItem('invoiceView', view); applyFilters();
+    }
+
+    function applyFilters() {
+        uiState.filters.search = document.getElementById('invoiceSearch')?.value.toLowerCase() || '';
+        uiState.filters.owner = document.getElementById('filterOwner')?.value || 'all';
+        uiState.filters.tenant = document.getElementById('filterTenant')?.value || 'all';
+        uiState.filters.contract = document.getElementById('filterContract')?.value || 'all';
+        uiState.filters.month = document.getElementById('filterMonth')?.value || 'all';
+        uiState.filters.year = document.getElementById('filterYear')?.value || 'all';
+        let visibleCount = 0;
+        const invoiceRows = document.querySelectorAll('.invoice-row');
+        const totalCount = invoiceRows.length;
+        invoiceRows.forEach(row => {
+            const data = row.dataset; let show = true;
+            if (uiState.filters.search && !(data.searchText || '').includes(uiState.filters.search)) show = false;
+            if (show && uiState.filters.owner !== 'all' && data.propietarioId !== uiState.filters.owner) show = false;
+            if (show && uiState.filters.tenant !== 'all' && data.inquilinoId !== uiState.filters.tenant) show = false;
+            if (show && uiState.filters.contract !== 'all' && data.contratoId !== uiState.filters.contract) show = false;
+            if (show && uiState.filters.month !== 'all' && data.month !== uiState.filters.month) show = false;
+            if (show && uiState.filters.year !== 'all' && data.year !== uiState.filters.year) show = false;
+            row.style.display = show ? (row.tagName === 'TR' && uiState.currentView === 'table' ? '' : (row.tagName === 'DIV' && uiState.currentView === 'card' ? 'block' : 'none')) : 'none';
+            if(row.style.display !== 'none') visibleCount++;
+        });
+        const visibleCountEl = document.getElementById('visibleCount');
+        const totalCountEl = document.getElementById('totalCount');
+        if(visibleCountEl) visibleCountEl.textContent = visibleCount;
+        if(totalCountEl) totalCountEl.textContent = totalCount;
+        const noFilteredRow = document.getElementById('no-filtered-invoices-row');
+        const noFilteredCard = document.getElementById('no-filtered-invoices-card');
+        const noInvoicesRow = document.getElementById('no-invoices-row');
+        const noInvoicesCard = document.getElementById('no-invoices-card');
+        const hasInvoices = totalCount > 0;
+        if(noFilteredRow) noFilteredRow.style.display = (hasInvoices && visibleCount === 0 && uiState.currentView === 'table') ? '' : 'none';
+        if(noFilteredCard) noFilteredCard.style.display = (hasInvoices && visibleCount === 0 && uiState.currentView === 'card') ? 'block' : 'none';
+        if(noInvoicesRow) noInvoicesRow.style.display = !hasInvoices && uiState.currentView === 'table' ? '' : 'none';
+        if(noInvoicesCard) noInvoicesCard.style.display = !hasInvoices && uiState.currentView === 'card' ? 'block' : 'none';
+    }
+
+    function makeInvoicesClickable() {
+        document.querySelectorAll('.invoice-row').forEach(element => {
+            const newElement = element.cloneNode(true);
+            element.parentNode.replaceChild(newElement, element);
+            newElement.addEventListener('click', function(event) {
+                if (event.target.closest('button, a, form, input, select, textarea')) return;
+                const invoiceId = this.dataset.id;
+                if (invoiceId) window.location.href = `/facturas/ver/${invoiceId}`;
+            });
+        });
+    }
+    
+    function createItemRowHTML(prefix, removeFn, calcFn) {
+        return `
+            <td class="px-4 py-2 whitespace-nowrap border-b border-gray-200 dark:border-gray-700">
+                <input type="text" name="${prefix}Description" class="form-input w-full rounded-md text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200" placeholder="Descripción" required>
+            </td>
+            <td class="px-4 py-2 whitespace-nowrap border-b border-gray-200 dark:border-gray-700">
+                <input type="number" name="${prefix}Quantity" value="1" min="0.01" step="any" required class="form-input w-full rounded-md text-sm text-center dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 ${prefix}-item-qty">
+            </td>
+            <td class="px-4 py-2 whitespace-nowrap border-b border-gray-200 dark:border-gray-700">
+                <input type="number" name="${prefix}UnitPrice" placeholder="0.00" step="0.01" min="0" required class="form-input w-full rounded-md text-sm text-right dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 ${prefix}-item-price">
+            </td>
+            <td class="px-4 py-2 whitespace-nowrap border-b border-gray-200 dark:border-gray-700 text-right">
+                <span class="text-sm font-medium text-gray-900 dark:text-white ${prefix}-item-total">0,00 €</span>
+            </td>
+            <td class="px-4 py-2 whitespace-nowrap text-right text-sm font-medium border-b border-gray-200 dark:border-gray-700">
+                <button type="button" onclick="${removeFn}(this)" class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 focus:outline-none" title="Eliminar concepto">
+                    <i class="fas fa-times-circle"></i>
+                </button>
+            </td>`;
+    }
+    function addRowToTable(tbodyId, rowHTML, calcFnName) {
+        const tbody = document.getElementById(tbodyId); if (!tbody) return;
+        const newRow = document.createElement('tr'); newRow.classList.add('invoice-item-row');
+        newRow.innerHTML = rowHTML; tbody.appendChild(newRow);
+        if (calcFnName === 'calculateTotals') addEventListenersToRow(newRow);
+        else if (calcFnName === 'calculateEditTotals') addEventListenersToEditRow(newRow);
+        if (typeof window[calcFnName] === 'function') window[calcFnName]();
+        const firstInput = newRow.querySelector('input[name*="Description"]'); if(firstInput) firstInput.focus();
+    }
+    function removeRowFromTable(button, tbodyId, addFnName, calcFnName) {
+        const row = button.closest('tr'); const tbody = document.getElementById(tbodyId); if (!row || !tbody) return;
+        row.remove();
+        if (tbody.rows.length === 0 && typeof window[addFnName] === 'function') window[addFnName]();
+        if (typeof window[calcFnName] === 'function') window[calcFnName]();
+    }
+    function addRowListeners(row, calcFnName) {
+        const qtyInput = row.querySelector('input[name*="Quantity"]');
+        const priceInput = row.querySelector('input[name*="UnitPrice"]');
+        if (qtyInput) qtyInput.addEventListener('input', () => window[calcFnName]());
+        if (priceInput) priceInput.addEventListener('input', () => window[calcFnName]());
+    }
+    function calculateTableTotals(modalSelector, tbodySelector, ivaRate, irpfRate, subtotalElId, ivaElId, irpfElId, totalElId, onlyCalculateItemSubtotal = false) {
+        const tbody = document.querySelector(`${modalSelector} ${tbodySelector}`); if (!tbody) return 0;
+        let itemsSubtotal = 0;
+        tbody.querySelectorAll('tr.invoice-item-row').forEach(row => {
+            const qty = parseFloat(row.querySelector('input[name*="Quantity"]')?.value) || 0;
+            const price = parseFloat(row.querySelector('input[name*="UnitPrice"]')?.value) || 0;
+            const lineTotal = qty * price; itemsSubtotal += lineTotal;
+            const totalSpan = row.querySelector('span[class*="-item-total"]');
+            if (totalSpan) totalSpan.textContent = lineTotal.toLocaleString(localeString, currencyFormatOptions);
+        });
+        if (onlyCalculateItemSubtotal) return itemsSubtotal;
+        const ivaAmt = itemsSubtotal * ivaRate; const irpfAmt = itemsSubtotal * irpfRate; const totalAmt = itemsSubtotal + ivaAmt - irpfAmt;
+        const subEl = document.querySelector(subtotalElId); if(subEl) subEl.textContent = itemsSubtotal.toLocaleString(localeString, currencyFormatOptions);
+        const ivaElDom = document.querySelector(ivaElId); if(ivaElDom) ivaElDom.textContent = ivaAmt.toLocaleString(localeString, currencyFormatOptions);
+        const irpfElDom = document.querySelector(irpfElId); if(irpfElDom) irpfElDom.textContent = `- ${irpfAmt.toLocaleString(localeString, currencyFormatOptions)}`;
+        const totEl = document.querySelector(totalElId); if(totEl) totEl.textContent = totalAmt.toLocaleString(localeString, currencyFormatOptions);
+        return itemsSubtotal;
+    }
+    function validateForm(modalSelector, tbodySelector, errorMsgSelector, issueDateSelector, dueDateSelector, requireItems) {
+        const errorDiv = document.querySelector(errorMsgSelector); if (errorDiv) errorDiv.innerHTML = '';
+        let isValid = true; const messages = [];
+        if (issueDateSelector) { const input = document.querySelector(issueDateSelector); if (!input || !input.value) { messages.push("Fecha de emisión es obligatoria."); isValid = false;}}
+        const tbody = document.querySelector(`${modalSelector} ${tbodySelector}`);
+        if (requireItems && (!tbody || tbody.rows.length === 0)) { messages.push("Debe añadir al menos un concepto."); isValid = false;}
+        else if (tbody) {
+            let hasValidItem = false; let oneRowHasData = false;
+            tbody.querySelectorAll('tr.invoice-item-row').forEach((row, index) => {
+                const descInput = row.querySelector('input[name*="Description"]'); const qtyInput = row.querySelector('input[name*="Quantity"]'); const priceInput = row.querySelector('input[name*="UnitPrice"]');
+                const desc = descInput?.value.trim(); const qty = parseFloat(qtyInput?.value); const price = parseFloat(priceInput?.value);
+                if (desc || !isNaN(qty) || !isNaN(price)) {
+                    oneRowHasData = true; let rowValid = true;
+                    if (!desc) { messages.push(`Fila ${index+1}: Falta descripción.`); rowValid = false; }
+                    if (isNaN(qty) || qty <= 0) { messages.push(`Fila ${index+1}: Cantidad inválida (>0).`); rowValid = false; }
+                    if (isNaN(price) || price < 0) { messages.push(`Fila ${index+1}: Precio inválido (>=0).`); rowValid = false; }
+                    if (rowValid) hasValidItem = true; else isValid = false;
+                }
+            });
+            if (requireItems && !hasValidItem && oneRowHasData) { messages.push("Ningún concepto es completamente válido. Revise las filas."); isValid = false;}
+            else if (requireItems && !oneRowHasData && tbody.rows.length > 0) { messages.push("Debe rellenar al menos un concepto."); isValid = false;} // Si hay filas pero todas vacías
+        }
+        if (!isValid && errorDiv) { errorDiv.innerHTML = messages.map(m => `<div>${m}</div>`).join('');}
+        const submitBtn = document.querySelector(`${modalSelector} button[type="submit"]`);
+        if(submitBtn) submitBtn.disabled = !isValid;
+        return isValid;
+    }
+
+    function showCreateInvoiceModal() {
+        const form = document.getElementById('createInvoiceForm'); if (form) form.reset();
+        const tbody = document.getElementById('invoiceItems'); if (tbody) tbody.innerHTML = '';
+        const dateInput = document.getElementById('invoiceDate'); if(dateInput) dateInput.value = new Date().toISOString().split('T')[0];
+        showModal('createInvoiceModal');
+        addItem(); // Añade la primera fila y esto llamará a calculateTotals y validateInvoiceForm
+    }
+	function deleteInvoice(invoiceId) {
+		const row = document.querySelector(`.invoice-row[data-id="${invoiceId}"]`);
+		const invoiceNumber = row ? row.dataset.numero : `ID ${invoiceId}`; // Obtener el número de factura para el modal
+		
+		const displayEl = document.getElementById('deleteInvoiceNumberDisplay');
+		if(displayEl) displayEl.textContent = invoiceNumber; // Mostrar el número en el modal
+		
+		const confirmBtn = document.getElementById('confirmDeleteInvoiceButton');
+		if (!confirmBtn) {
+			console.error("Botón de confirmación 'confirmDeleteInvoiceButton' no encontrado en el modal de borrado.");
+			return;
+		}
+
+		// Es crucial que el listener onclick se asigne CADA VEZ que se llama a deleteInvoice,
+		// para que use el invoiceId correcto.
+		confirmBtn.onclick = () => {
+			// console.log(`Confirmado borrado para factura ID: ${invoiceId}`);
+			if (typeof confirmDeleteWithToken === 'function') {
+				confirmDeleteWithToken(
+					'deleteInvoiceModal', // ID del modal de confirmación
+					`/facturas/delete/${invoiceId}`, // URL para la acción de borrado
+					csrfTokenGlobal // El token CSRF global
+				);
+			} else {
+				console.error("Función confirmDeleteWithToken no definida. Asegúrate de que está en base.html o un script global.");
+				// Fallback simple si la función no existe (no recomendado para producción sin confirmación)
+				// alert("Error: La función de confirmación de borrado no está disponible.");
+			}
+		};
+		showModal('deleteInvoiceModal'); // Mostrar el modal de confirmación
+	}
+    function addItem() { addRowToTable('invoiceItems', createItemRowHTML('item', 'removeItem', 'calculateTotals'), 'calculateTotals'); validateInvoiceForm();}
+    function removeItem(button) { removeRowFromTable(button, 'invoiceItems', 'addItem', 'calculateTotals'); validateInvoiceForm();}
+    function calculateTotals() { calculateTableTotals('#createInvoiceModal', '#invoiceItems', IVA_RATE, IRPF_RATE, '#invoiceSubtotal', '#invoiceIVA', '#invoiceIRPF', '#invoiceTotal'); validateInvoiceForm();}
+    function addEventListenersToRow(row) { addRowListeners(row, 'calculateTotals');}
+    function validateInvoiceForm() { return validateForm('#createInvoiceModal', '#invoiceItems', '#formErrorMessages', '#invoiceDate', null, true);}
+
+    let currentEditInvoiceRates = { iva: 0, irpf: 0 };
+    function addEditItem() { addRowToTable('editInvoiceItems', createItemRowHTML('editItem', 'removeEditItem', 'calculateEditTotals'), 'calculateEditTotals'); validateEditInvoiceForm();}
+    function removeEditItem(button) { removeRowFromTable(button, 'editInvoiceItems', 'addEditItem', 'calculateEditTotals'); validateEditInvoiceForm();}
+    function calculateEditTotals() {
+        const itemsSubtotal = calculateTableTotals('#editInvoiceModal', '#editInvoiceItems', 0, 0, '#editInvoiceSubtotal', '#editInvoiceIVA', '#editInvoiceIRPF', '#editInvoiceTotal', true);
+        const ivaMonto = itemsSubtotal * currentEditInvoiceRates.iva; const irpfMonto = itemsSubtotal * currentEditInvoiceRates.irpf; const totalFinal = itemsSubtotal + ivaMonto - irpfMonto;
+        document.getElementById('editInvoiceSubtotal').textContent = itemsSubtotal.toLocaleString(localeString, currencyFormatOptions);
+        document.getElementById('editInvoiceIVA').textContent = ivaMonto.toLocaleString(localeString, currencyFormatOptions);
+        document.getElementById('editInvoiceIRPF').textContent = `- ${irpfMonto.toLocaleString(localeString, currencyFormatOptions)}`;
+        document.getElementById('editInvoiceTotal').textContent = totalFinal.toLocaleString(localeString, currencyFormatOptions);
+        document.getElementById('editInvoiceIvaRatePercent').textContent = (currentEditInvoiceRates.iva * 100).toFixed(2).replace('.',',');
+        document.getElementById('editInvoiceIrpfRatePercent').textContent = (currentEditInvoiceRates.irpf * 100).toFixed(2).replace('.',',');
+        validateEditInvoiceForm();
+    }
+    function addEventListenersToEditRow(row) { addRowListeners(row, 'calculateEditTotals');}
+    function validateEditInvoiceForm() { return validateForm('#editInvoiceModal', '#editInvoiceItems', '#editFormErrorMessages', null, null, true);}
+    
+    function editInvoice(buttonElementOrRow) {
+        try {
+            const row = buttonElementOrRow.closest ? buttonElementOrRow.closest('.invoice-row') : buttonElementOrRow;
+            if (!row) { console.error("Elemento de factura no encontrado para editar."); return; }
+            const data = row.dataset; const invoiceId = data.id;
+            document.getElementById('editInvoiceNotes').value = data.notas || '';
+            document.getElementById('editInvoiceNumberDisplay').textContent = data.numero || 'N/A';
+            const isoDate = data.fechaEmision;
+            document.getElementById('editInvoiceIssueDateDisplay').textContent = isoDate ? new Date(isoDate).toLocaleDateString('es-ES', {day:'2-digit', month:'2-digit', year:'numeric'}) : 'N/A';
+            currentEditInvoiceRates.iva = parseFloat(data.ivaAplicado || IVA_RATE);
+            currentEditInvoiceRates.irpf = parseFloat(data.irpfAplicado || IRPF_RATE);
+            const editTbody = document.getElementById('editInvoiceItems'); editTbody.innerHTML = '';
+            let items = []; try { items = JSON.parse(data.itemsJson || '[]');} catch (e) {console.error("Error parseando itemsJson:", e); items = [];}
+            if (Array.isArray(items) && items.length > 0) {
+                items.forEach(item => {
+                    const newRow = document.createElement('tr'); newRow.classList.add('invoice-item-row');
+                    newRow.innerHTML = createItemRowHTML('editItem', 'removeEditItem', 'calculateEditTotals');
+                    newRow.querySelector('input[name="editItemDescription"]').value = item.description || '';
+                    newRow.querySelector('input[name="editItemQuantity"]').value = item.quantity === undefined ? 1 : item.quantity;
+                    newRow.querySelector('input[name="editItemUnitPrice"]').value = item.unitPrice === undefined ? 0.00 : item.unitPrice;
+                    editTbody.appendChild(newRow); addEventListenersToEditRow(newRow);
+                });
+            } else { addEditItem(); }
+            calculateEditTotals(); 
+            const editForm = document.getElementById('editInvoiceForm');
+            editForm.action = `/facturas/edit/${invoiceId}`;
+            const submitBtnEdit = editForm.querySelector('button[type="submit"]');
+            if (submitBtnEdit) submitBtnEdit.disabled = false; // Habilitar por defecto, la validación lo ajustará
+            validateEditInvoiceForm(); // Validar después de poblar todo
+            showModal('editInvoiceModal');
+        } catch (e) { console.error("Error en editInvoice:", e); alert("Error al preparar edición.");}
+    }
+
+    function prepareEditInvoiceData() {
+        const tbody = document.getElementById('editInvoiceItems');
+        const itemsJsonInput = document.getElementById('editItemsJson');
+        if (!validateEditInvoiceForm()) return false;
+        const itemsArray = [];
+        tbody.querySelectorAll('tr.invoice-item-row').forEach(row => {
+            const desc = row.querySelector('input[name="editItemDescription"]')?.value.trim();
+            const qtyStr = row.querySelector('input[name="editItemQuantity"]')?.value.trim();
+            const priceStr = row.querySelector('input[name="editItemUnitPrice"]')?.value.trim();
+            if (desc && qtyStr && priceStr) {
+                itemsArray.push({description: desc, quantity: parseFloat(qtyStr), unitPrice: parseFloat(priceStr)});
+            }
+        });
+        itemsJsonInput.value = JSON.stringify(itemsArray);
+        return true;
+    }
+
+    // --- INICIALIZACIÓN ---
+    document.addEventListener("DOMContentLoaded", function() {
+        console.log("DOM Cargado. Configurando listeners para Facturas...");
+
+        function adjustScrollHeight() {
+            const headerFixed = document.querySelector('.flex-shrink-0');
+            const scrollContainer = document.querySelector('.flex-grow.overflow-y-auto');
+            if (headerFixed && scrollContainer) {
+                const headerHeight = headerFixed.offsetHeight;
+                const mainContentArea = document.getElementById('mainContentArea');
+                if (!mainContentArea) return;
+                const mainElement = mainContentArea.querySelector('main');
+                if (!mainElement) return;
+                const mainContentPaddingTop = parseFloat(window.getComputedStyle(mainElement).paddingTop);
+                const navHeader = document.querySelector('body > div.flex > div.main-content > header'); // Selector más específico
+                const navHeight = navHeader?.offsetHeight || 0;
+                const footer = document.querySelector('body > div.flex > div.main-content > footer'); // Selector más específico
+                const footerHeight = footer?.offsetHeight || 0;
+                const windowHeight = window.innerHeight;
+                const availableHeight = windowHeight - navHeight - mainContentPaddingTop - headerHeight - footerHeight - 20; // Reducido margen
+                scrollContainer.style.height = `${Math.max(200, availableHeight)}px`;
+            }
+        }
+        adjustScrollHeight();
+        window.addEventListener('resize', adjustScrollHeight);
+
+        // Listeners para botones de vista
+        const tableViewBtn = document.getElementById('tableViewBtn');
+        const cardViewBtn = document.getElementById('cardViewBtn');
+        if(tableViewBtn) tableViewBtn.addEventListener('click', () => toggleView('table'));
+        if(cardViewBtn) cardViewBtn.addEventListener('click', () => toggleView('card'));
+        
+        // Listeners para filtros
+        document.getElementById('invoiceSearch')?.addEventListener('keyup', applyFilters);
+        ['filterOwner', 'filterTenant', 'filterContract', 'filterMonth', 'filterYear'].forEach(id => {
+            document.getElementById(id)?.addEventListener('change', applyFilters);
+        });
+        
+        // Botón para crear nueva factura
+        const createBtn = document.querySelector('button[onclick="showCreateInvoiceModal()"]');
+        if (createBtn) createBtn.addEventListener('click', showCreateInvoiceModal); // Directamente llamar a la función
+
+        // Delegación de eventos para acciones en tabla y tarjetas
+        const tableBody = document.getElementById('invoicesTable');
+        const cardContainer = document.getElementById('cardView');
+        function handleActionClick(event) {
+            const target = event.target.closest('button, a');
+            if (!target) return;
+            const invoiceRow = target.closest('.invoice-row');
+            if (!invoiceRow) return;
+            const invoiceId = invoiceRow.dataset.id;
+            
+            let actionProcessed = false;
+            if (target.matches('button[onclick*="editInvoice"]')) {
+                event.stopPropagation(); if (typeof editInvoice === "function") editInvoice(invoiceRow); actionProcessed = true;
+            } else if (target.matches('button[onclick*="deleteInvoice"]')) {
+                event.stopPropagation(); if (invoiceId && typeof deleteInvoice === "function") deleteInvoice(invoiceId); actionProcessed = true;
+            } else if (target.closest('form[action*="mark_as_paid"]') || target.closest('form[action*="send_invoice_email"]') || target.closest('a[href*="download_factura"]')) {
+                event.stopPropagation(); actionProcessed = true; // Permitir la acción del form/enlace pero detener la propagación a la fila
+            }
+             // Si el clic fue en un botón de acción, no dejar que el clic de la fila/tarjeta navegue
+            if(actionProcessed) event.preventDefault();
+        }
+        if (tableBody) tableBody.addEventListener('click', handleActionClick);
+        if (cardContainer) cardContainer.addEventListener('click', handleActionClick);
+        
+        toggleView(uiState.currentView); // Establece vista y llama a applyFilters
+        makeInvoicesClickable();
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const editId = urlParams.get('edit');
+        if (editId) {
+            setTimeout(() => {
+                const invoiceElement = document.querySelector(`.invoice-row[data-id="${editId}"]`);
+                if (invoiceElement && typeof editInvoice === "function") {
+                    editInvoice(invoiceElement);
+                }
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }, 250);
+        }
+        
+        document.addEventListener('keydown', (event) => { if (event.key === "Escape") { closeModal('createInvoiceModal'); closeModal('editInvoiceModal'); closeModal('deleteInvoiceModal');}});
+        document.querySelectorAll('.modal-overlay-general').forEach(overlay => { // Asumiendo una clase común para overlays
+            overlay.addEventListener('click', (event) => { 
+                if (event.target === overlay) {
+                    const modalToClose = overlay.closest('.fixed.inset-0.z-50');
+                    if (modalToClose) closeModal(modalToClose.id);
+                }
+            });
+        });
+        console.log("Listeners globales de Facturas configurados.");
+    });
+</script>
+<style>
+    #invoicesTable tr.invoice-row:hover td:not(:last-child),
+    #cardView div.invoice-card:hover {
+        background-color: rgba(59, 130, 246, 0.05);
+        transition: background-color 0.2s ease;
+    }
+    .dark #invoicesTable tr.invoice-row:hover td:not(:last-child),
+    .dark #cardView div.invoice-card:hover {
+        background-color: rgba(59, 130, 246, 0.1);
+    }
+    .invoice-row[data-id],
+    .invoice-card[data-id] {
+        cursor: pointer;
+    }
+    .invoice-row[data-id] td:last-child,
+    .invoice-card[data-id] .flex.space-x-1 {
+        cursor: auto;
+    }
+    /* Estilo para overlay de modal, si no lo tienes globalmente */
+    .modal-overlay-general { /* Añade esta clase al div del backdrop en tus modales */
+        /* background-color: rgba(0, 0, 0, 0.5); */ /* Ejemplo */
+    }
+</style>
+
+{% endblock %}

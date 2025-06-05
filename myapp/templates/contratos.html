@@ -1,0 +1,2173 @@
+{% extends 'base.html' %}
+
+{% block title %}Contratos - RentalSys{% endblock %}
+{% block header_title %}Contratos{% endblock %}
+
+
+
+
+{% block content %}
+
+
+<!-- Encabezado -->
+<div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+  <h2 class="text-2xl font-semibold text-gray-800 dark:text-gray-100 mb-4 md:mb-0">Gestión de Contratos</h2>
+  <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+    {% if current_user.is_authenticated and current_user.role in ['admin', 'gestor'] %}
+        <button onclick="showCreateContractModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md flex items-center focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+            <i class="fas fa-plus mr-2"></i> Nuevo contrato
+        </button>
+    {% endif %}
+    <div class="relative">
+      <input type="text" id="contractSearch" placeholder="Buscar contratos..." 
+             class="form-input pl-10 pr-4 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 focus:border-blue-500 focus:ring-blue-500" 
+             onkeyup="applyContractFilters()">
+      <div class="absolute left-3 top-2.5 text-gray-400"><i class="fas fa-search"></i></div>
+    </div>
+  </div>
+</div>
+
+<!-- Tarjetas de estadísticas -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Contratos Activos</p>
+                <p class="text-2xl font-semibold text-gray-800 dark:text-white">{{ contratos | selectattr('estado', 'equalto', 'activo') | list | length }}</p>
+            </div>
+            <div class="p-3 rounded-full bg-green-100 dark:bg-green-900/50 text-green-600 dark:text-green-400">
+                <i class="fas fa-file-signature text-xl"></i>
+            </div>
+        </div>
+    </div>
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Por Vencer (30d)</p>
+                <p class="text-2xl font-semibold text-gray-800 dark:text-white">{{ por_vencer_count }}</p>
+            </div>
+            <div class="p-3 rounded-full bg-yellow-100 dark:bg-yellow-900/50 text-yellow-600 dark:text-yellow-400">
+                <i class="fas fa-exclamation-circle text-xl"></i>
+            </div>
+        </div>
+    </div>
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Ingresos Mensuales</p>
+                <p class="text-2xl font-semibold text-gray-800 dark:text-white">{{ (contratos | selectattr('estado', 'equalto', 'activo') | sum(attribute='precio_mensual')) | currency }}</p>
+            </div>
+            <div class="p-3 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400">
+                <i class="fas fa-euro-sign text-xl"></i>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filtros y cambio de vista -->
+<div class="mb-6 flex flex-col md:flex-row justify-between items-start md:items-center space-y-4 md:space-y-0">
+  <div class="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
+      <div class="flex space-x-1 sm:space-x-2 flex-wrap gap-y-2">
+        <span class="text-sm font-medium text-gray-700 dark:text-gray-300 pt-1.5 hidden sm:inline">Estado:</span>
+        <button data-filter="all" onclick="setActiveFilter(this)" class="filter-btn px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md border bg-blue-600 text-white hover:bg-blue-700">Todos</button>
+        <button data-filter="activo" onclick="setActiveFilter(this)" class="filter-btn px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md border bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 dark:border-gray-600">Activos</button>
+        <button data-filter="pendiente" onclick="setActiveFilter(this)" class="filter-btn px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md border bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 dark:border-gray-600">Pendientes</button>
+        <button data-filter="expirado" onclick="setActiveFilter(this)" class="filter-btn px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md border bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 dark:border-gray-600">Expirados</button>
+        <button data-filter="cancelado" onclick="setActiveFilter(this)" class="filter-btn px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md border bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 dark:border-gray-600">Cancelados</button>
+      </div>
+      <div class="flex items-center space-x-2">
+         <label for="ownerFilter" class="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">Propietario:</label>
+         <select id="ownerFilter" class="form-input py-1.5 text-xs sm:text-sm rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 focus:border-blue-500 focus:ring-blue-500" onchange="applyContractFilters()">
+             <option value="all" selected>Todos</option>
+             {% for owner in propietarios %} 
+                <option value="{{ owner.id }}">{{ owner.nombre }}</option> 
+             {% else %} 
+                {% if current_user.role == 'admin' %}
+                    <option value="" disabled>No hay propietarios</option>
+                {% else %}
+                    <option value="" disabled>No asignados</option>
+                {% endif %} 
+             {% endfor %}
+         </select>
+      </div>
+  </div>
+  <div class="inline-flex rounded-md shadow-sm self-end sm:self-center">
+    <button id="tableViewBtn" onclick="toggleView('table')" class="px-4 py-2 text-sm font-medium rounded-l-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-600 focus:z-10 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+        <i class="fas fa-table mr-2"></i><span class="hidden sm:inline">Tabla</span>
+    </button>
+    <button id="cardViewBtn" onclick="toggleView('card')" class="px-4 py-2 text-sm font-medium rounded-r-lg border border-gray-200 dark:border-gray-600 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:z-10 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+        <i class="fas fa-th-large mr-2"></i><span class="hidden sm:inline">Tarjetas</span>
+    </button>
+  </div>
+</div>
+
+<!-- Vista Tabla -->
+<div id="tableView" class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+  <div class="overflow-x-auto">
+    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+      <thead class="bg-gray-50 dark:bg-gray-700">
+        <tr>
+          <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Contrato</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Propiedad</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Inquilino</th>
+          <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Inicio</th>
+          <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Fin</th>
+          <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Precio</th>
+          <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Estado</th>
+          <th class="px-2 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Act. Renta</th>
+		  <th class="px-1 py-1 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider" title="Aplicar IVA">IVA</th>
+          <th class="px-1 py-1 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider" title="Aplicar Retención IRPF">IRPF</th>
+          {% if current_user.is_authenticated and current_user.role in ['admin', 'gestor'] %}
+          <th class="px-6 py-1 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Acciones</th>
+          {% endif %}
+        </tr>
+      </thead>
+      <tbody id="contractsTable" class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+        {% if contratos %}
+          {% for contract in contratos %}
+            {% set doc_data = [] %}
+            {% for d in contract.documentos %}
+                {% set _ = doc_data.append({'id': d.id, 'original_filename': d.original_filename, 'filename': d.filename}) %}
+            {% endfor %}
+            <tr class="highlight-row contract-row hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                data-id="{{ contract.id }}"
+                data-estado="{{ contract.estado }}"
+                data-propietario-id="{{ contract.propiedad_ref.propietario_id if contract.propiedad_ref else '' }}"
+                data-numero-contrato="{{ contract.numero_contrato | e }}"
+                data-tipo="{{ contract.tipo | default('Local de Negocio', true) | e }}"
+                data-propiedad-id="{{ contract.propiedad_id }}"
+                data-inquilino-id="{{ contract.inquilino_id }}"
+                data-fecha-inicio="{{ contract.fecha_inicio.isoformat() if contract.fecha_inicio else '' }}"
+                data-fecha-fin="{{ contract.fecha_fin.isoformat() if contract.fecha_fin else '' }}"
+                data-precio-mensual="{{ contract.precio_mensual }}"
+                data-deposito="{{ contract.deposito | default(0.0) }}"
+                data-dia-pago="{{ contract.dia_pago | default(1) }}"
+                data-notas="{{ contract.notas | default('', true) | e }}"
+                data-tipo-actualizacion-renta="{{ contract.tipo_actualizacion_renta | default('indice', true) | e }}"
+                data-actualiza-ipc="{{ 'true' if contract.actualiza_ipc else 'false' }}"
+                data-actualiza-irav="{{ 'true' if contract.actualiza_irav else 'false' }}"
+                data-ipc-ano-inicio="{{ contract.ipc_ano_inicio | default('', true) }}"
+                data-ipc-mes-inicio="{{ contract.ipc_mes_inicio | default('', true) }}"
+                data-importe-actualizacion-fija="{{ contract.importe_actualizacion_fija | default('', true) }}"
+                data-aplicar-indice-retroactivo="{{ 'true' if contract.aplicar_indice_retroactivo else 'false' }}"
+                data-aplicar-iva="{{ 'true' if contract.aplicar_iva else 'false' }}"
+                data-aplicar-irpf="{{ 'true' if contract.aplicar_irpf else 'false' }}"
+                data-documentos='{{ doc_data|tojson|safe }}'
+				data-serie-facturacion-prefijo="{{ contract.serie_facturacion_prefijo | default('', true) | e }}"
+				data-serie-facturacion-ultimo-numero="{{ contract.serie_facturacion_ultimo_numero | default('0', true) }}"
+				data-serie-facturacion-ano-actual="{{ contract.serie_facturacion_ano_actual | default('', true) }}"
+				data-serie-facturacion-formato-digitos="{{ contract.serie_facturacion_formato_digitos | default('4', true) }}">
+                
+                <td class="px-3 py-4 whitespace-nowrap">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0 h-10 w-10">
+                            <i class="fas fa-file-contract text-xl text-gray-500 dark:text-gray-400"></i>
+                        </div>
+                        <div class="ml-1">
+                            <div class="text-sm font-medium text-gray-900 dark:text-white">{{ contract.numero_contrato }}</div>
+                            <div class="text-sm text-gray-500 dark:text-gray-400">{{ contract.tipo | default('N/A') }}</div>
+                        </div>
+                    </div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="text-sm text-gray-900 dark:text-white">{{ contract.propiedad_ref.direccion if contract.propiedad_ref else 'N/A' }}</div>
+                    <div class="text-sm text-gray-500 dark:text-gray-400">{{ contract.propiedad_ref.ciudad if contract.propiedad_ref and contract.propiedad_ref.ciudad else '' }}</div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="text-sm text-gray-900 dark:text-white">{{ contract.inquilino_ref.nombre if contract.inquilino_ref else 'N/A' }}</div>
+                    <div class="text-sm text-gray-500 dark:text-gray-400">{{ contract.inquilino_ref.nif if contract.inquilino_ref and contract.inquilino_ref.nif else '' }}</div>
+                </td>
+                <td class="px-3 py-4 whitespace-nowrap">
+                    <div class="text-sm text-gray-500 dark:text-gray-400">{{ contract.fecha_inicio | date }}</div>
+                </td>
+                <td class="px-1 py-1 whitespace-nowrap">
+                    <div class="text-sm text-gray-500 dark:text-gray-400">{{ contract.fecha_fin | date if contract.fecha_fin else 'Indefinido' }}</div>
+                </td>
+                <td class="px-3 py-4 whitespace-nowrap">
+                    <div class="text-sm text-gray-900 dark:text-white">{{ contract.precio_mensual | currency }}<span class="text-xs text-gray-500">/mes</span></div>
+                </td>
+                <td class="px-3 py-4 whitespace-nowrap">
+                    {% if contract.estado == 'activo' %}
+                        <span class="status-badge status-active">Activo</span>
+                    {% elif contract.estado == 'expirado' %}
+                        <span class="status-badge status-expired">Expirado</span>
+                    {% elif contract.estado == 'pendiente' %}
+                        <span class="status-badge status-pending">Pendiente</span>
+                    {% elif contract.estado == 'cancelado' %}
+                        <span class="status-badge status-cancelada">Cancelado</span>
+                    {% else %}
+                        <span class="status-badge status-other">{{ contract.estado | capitalize }}</span>
+                    {% endif %}
+                </td>
+                <td class="px-1 py-1 whitespace-nowrap text-sm">
+                    {% if contract.tipo_actualizacion_renta == 'indice' %}
+                        {% if contract.actualiza_ipc %}
+                            <span class="text-green-600 dark:text-green-400" title="Ref: {{ contract.ipc_mes_inicio }}/{{ contract.ipc_ano_inicio }}">IPC <i class="fas fa-chart-line ml-1"></i></span>
+                        {% elif contract.actualiza_irav %}
+                            <span class="text-indigo-600 dark:text-indigo-400" title="Ref: {{ contract.ipc_mes_inicio }}/{{ contract.ipc_ano_inicio }}">IRAV <i class="fas fa-chart-line ml-1"></i></span>
+                        {% else %}
+                            <span class="text-gray-400 dark:text-gray-500" title="Índice no especificado"><i class="fas fa-question-circle mr-1"></i>Índice</span>
+                        {% endif %}
+                    {% elif contract.tipo_actualizacion_renta == 'fijo' %}
+                        <span class="text-purple-600 dark:text-purple-400" title="Importe: {{ contract.importe_actualizacion_fija | currency }}">Fijo <i class="fas fa-dollar-sign ml-1"></i></span>
+                    {% elif contract.tipo_actualizacion_renta == 'indice_mas_fijo' %}
+                        <span class="text-pink-600 dark:text-pink-400" title="Índice + Fijo ({{contract.importe_actualizacion_fija | currency}})">Índice+Fijo <i class="fas fa-plus-circle ml-1"></i></span>
+                    {% elif contract.tipo_actualizacion_renta == 'manual' %}
+                        <span class="text-orange-500 dark:text-orange-400" title="Actualización Manual">Manual <i class="fas fa-hand-paper ml-1"></i></span>
+                    {% else %}
+                        <span class="text-gray-400 dark:text-gray-500" title="No actualiza"><i class="fas fa-times-circle mr-1"></i>No</span>
+                    {% endif %}
+                </td>
+                <td class="px-1 py-1 whitespace-nowrap text-center">
+                    {% if contract.aplicar_iva %}
+                        <i class="fas fa-check text-green-500" title="IVA Aplicado"></i>
+                    {% else %}
+                        <i class="fas fa-times text-red-500" title="IVA No Aplicado"></i>
+                    {% endif %}
+                </td>
+                <td class="px-1 py-1 whitespace-nowrap text-center">
+                    {% if contract.aplicar_irpf %}
+                        <i class="fas fa-check text-green-500" title="IRPF Aplicado"></i>
+                    {% else %}
+                        <i class="fas fa-times text-red-500" title="IRPF No Aplicado"></i>
+                    {% endif %}
+                </td>
+                {% if current_user.is_authenticated and current_user.role in ['admin', 'gestor'] %}
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+                        <button onclick="viewContract({{ contract.id }})" class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300" title="Ver">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                        <button onclick="editContract(this)" class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300" title="Editar">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button onclick="deleteContract({{ contract.id }})" class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300" title="Eliminar">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                {% endif %}
+            </tr>
+          {% endfor %}
+          {% set colspan_value = 10 if not (current_user.is_authenticated and current_user.role in ['admin', 'gestor']) else 11 %}
+          <tr id="no-contracts-row" {% if contratos %}style="display: none;"{% endif %}>
+              <td colspan="{{ colspan_value }}" class="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400 italic">
+                  No hay contratos registrados que puedas ver.
+              </td>
+          </tr>
+          <tr id="no-filtered-contracts-row" style="display: none;">
+              <td colspan="{{ colspan_value }}" class="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400 italic">
+                  No se encontraron contratos que coincidan con los filtros.
+              </td>
+          </tr>
+        {% else %}
+             {% set colspan_value = 10 if not (current_user.is_authenticated and current_user.role in ['admin', 'gestor']) else 11 %}
+             <tr id="no-contracts-row">
+                 <td colspan="{{ colspan_value }}" class="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400 italic">
+                     No hay contratos registrados que puedas ver.
+                 </td>
+             </tr>
+             <tr id="no-filtered-contracts-row" style="display: none;">
+                 <td colspan="{{ colspan_value }}" class="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400 italic">
+                     No se encontraron contratos que coincidan con los filtros.
+                 </td>
+             </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+  <div class="bg-gray-50 dark:bg-gray-700 px-6 py-3 flex items-center justify-between border-t border-gray-200 dark:border-gray-600">
+    <div>
+      <p class="text-sm text-gray-700 dark:text-gray-300">
+        Mostrando <span class="font-medium" id="visibleTableCount">0</span> de <span class="font-medium" id="totalTableCount">0</span> contratos
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- Vista Tarjetas -->
+<div id="cardView" class="hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    {% if contratos %}
+        {% for contract in contratos %}
+            {% set doc_data = [] %}
+            {% for d in contract.documentos %}
+                {% set _ = doc_data.append({'id': d.id, 'original_filename': d.original_filename, 'filename': d.filename}) %}
+            {% endfor %}
+            <div class="contract-card bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden transition duration-300 ease-in-out contract-row hover:shadow-lg"
+                data-id="{{ contract.id }}"
+                data-estado="{{ contract.estado }}"
+                data-propietario-id="{{ contract.propiedad_ref.propietario_id if contract.propiedad_ref else '' }}"
+                data-numero-contrato="{{ contract.numero_contrato | e }}"
+                data-tipo="{{ contract.tipo | default('Local de Negocio', true) | e }}"
+                data-propiedad-id="{{ contract.propiedad_id }}"
+                data-inquilino-id="{{ contract.inquilino_id }}"
+                data-fecha-inicio="{{ contract.fecha_inicio.isoformat() if contract.fecha_inicio else '' }}"
+                data-fecha-fin="{{ contract.fecha_fin.isoformat() if contract.fecha_fin else '' }}"
+                data-precio-mensual="{{ contract.precio_mensual }}"
+                data-deposito="{{ contract.deposito | default(0.0) }}"
+                data-dia-pago="{{ contract.dia_pago | default(1) }}"
+                data-notas="{{ contract.notas | default('', true) | e }}"
+                data-tipo-actualizacion-renta="{{ contract.tipo_actualizacion_renta | default('indice', true) | e }}"
+                data-actualiza-ipc="{{ 'true' if contract.actualiza_ipc else 'false' }}"
+                data-actualiza-irav="{{ 'true' if contract.actualiza_irav else 'false' }}"
+                data-ipc-ano-inicio="{{ contract.ipc_ano_inicio | default('', true) }}"
+                data-ipc-mes-inicio="{{ contract.ipc_mes_inicio | default('', true) }}"
+                data-importe-actualizacion-fija="{{ contract.importe_actualizacion_fija | default('', true) }}"
+                data-aplicar-indice-retroactivo="{{ 'true' if contract.aplicar_indice_retroactivo else 'false' }}"
+                data-aplicar-iva="{{ 'true' if contract.aplicar_iva else 'false' }}"
+                data-aplicar-irpf="{{ 'true' if contract.aplicar_irpf else 'false' }}"
+                data-documentos='{{ doc_data|tojson|safe }}'
+				data-serie-facturacion-prefijo="{{ contract.serie_facturacion_prefijo | default('', true) | e }}"
+				data-serie-facturacion-ultimo-numero="{{ contract.serie_facturacion_ultimo_numero | default('0', true) }}"
+				data-serie-facturacion-ano-actual="{{ contract.serie_facturacion_ano_actual | default('', true) }}"
+				data-serie-facturacion-formato-digitos="{{ contract.serie_facturacion_formato_digitos | default('4', true) }}">				
+                
+                <div class="p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-lg font-semibold text-gray-800 dark:text-white">{{ contract.numero_contrato }}</h3>
+                        {% if contract.estado == 'activo' %}
+                            <span class="status-badge status-active">Activo</span>
+                        {% elif contract.estado == 'expirado' %}
+                            <span class="status-badge status-expired">Expirado</span>
+                        {% elif contract.estado == 'pendiente' %}
+                            <span class="status-badge status-pending">Pendiente</span>
+                        {% elif contract.estado == 'cancelado' %}
+                            <span class="status-badge status-cancelada">Cancelado</span>
+                        {% else %}
+                            <span class="status-badge status-other">{{ contract.estado | capitalize }}</span>
+                        {% endif %}
+                    </div>
+                    <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ contract.tipo | default('Tipo no especificado') }}</p>
+                </div>
+                <div class="p-4">
+				
+				
+					<div class="mb-4 space-y-1">
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-500 dark:text-gray-400">Propiedad:</span>
+                            <span class="font-medium text-gray-800 dark:text-white text-right truncate ml-2">{{ contract.propiedad_ref.direccion if contract.propiedad_ref else 'N/A' }}</span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-500 dark:text-gray-400">Inquilino:</span>
+                            <span class="font-medium text-gray-800 dark:text-white text-right truncate ml-2">{{ contract.inquilino_ref.nombre if contract.inquilino_ref else 'N/A' }}</span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-500 dark:text-gray-400">Precio:</span>
+                            <span class="font-medium text-gray-800 dark:text-white">{{ contract.precio_mensual | currency }}/mes</span>
+                        </div>
+                        <div class="flex justify-between text-xs mt-1 pt-1 border-t border-dashed dark:border-gray-600">
+                            <span class="text-gray-500 dark:text-gray-400">Impuestos:</span>
+                            <div class="space-x-2">
+                                <span class="font-medium {{ 'text-green-600 dark:text-green-400' if contract.aplicar_iva else 'text-red-600 dark:text-red-400 line-through' }}">IVA</span>
+                                <span class="font-medium {{ 'text-green-600 dark:text-green-400' if contract.aplicar_irpf else 'text-red-600 dark:text-red-400 line-through' }}">IRPF</span>
+                            </div>
+                        </div>
+                        <div class="flex justify-between text-xs mt-1 pt-1 border-t border-dashed dark:border-gray-600">
+                            <span class="text-gray-500 dark:text-gray-400">Act. Renta:</span>
+                            {% if contract.tipo_actualizacion_renta == 'indice' %}
+                                {% if contract.actualiza_ipc %}
+                                    <span class="font-medium text-green-600 dark:text-green-400">IPC ({{ contract.ipc_mes_inicio }}/{{ contract.ipc_ano_inicio }})</span>
+                                {% elif contract.actualiza_irav %}
+                                    <span class="font-medium text-indigo-600 dark:text-indigo-400">IRAV ({{ contract.ipc_mes_inicio }}/{{ contract.ipc_ano_inicio }})</span>
+                                {% else %}
+                                    <span class="font-medium text-gray-500 dark:text-gray-400">Índice (N/E)</span>
+                                {% endif %}
+                            {% elif contract.tipo_actualizacion_renta == 'fijo' %}
+                                <span class="font-medium text-purple-600 dark:text-purple-400">Fijo ({{contract.importe_actualizacion_fija | currency}})</span>
+                            {% elif contract.tipo_actualizacion_renta == 'indice_mas_fijo' %}
+                                <span class="font-medium text-pink-600 dark:text-pink-400">Índice+Fijo ({{contract.importe_actualizacion_fija | currency}})</span>
+                            {% elif contract.tipo_actualizacion_renta == 'manual' %}
+                                <span class="font-medium text-orange-500 dark:text-orange-400">Manual</span>
+                            {% else %}
+                                <span class="font-medium text-gray-500 dark:text-gray-400">No</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="mb-4 space-y-1">
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-500 dark:text-gray-400">Inicio:</span>
+                            <span class="font-medium text-gray-800 dark:text-white">{{ contract.fecha_inicio | date }}</span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-500 dark:text-gray-400">Fin:</span>
+                            <span class="font-medium text-gray-800 dark:text-white">{{ contract.fecha_fin | date if contract.fecha_fin else 'Indefinido' }}</span>
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <div class="flex justify-between text-xs text-gray-500 dark:text-gray-400 mb-1">
+                            <span>Progreso</span>
+                            <span>{{ contract.progress_percent }}%</span>
+                        </div>
+                        <div class="progress-bar bg-gray-200 dark:bg-gray-700 w-full">
+                            <div class="progress-fill" style="width: {{ contract.progress_percent }}%"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="px-4 py-3 bg-gray-50 dark:bg-gray-700/50 border-t border-gray-200 dark:border-gray-600 flex justify-end space-x-2">
+                    <button onclick="viewContract({{ contract.id }})" class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300" title="Ver">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                    {% if current_user.is_authenticated and current_user.role in ['admin', 'gestor'] %}
+                        <button onclick="editContract(this)" class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300" title="Editar">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button onclick="deleteContract({{ contract.id }})" class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300" title="Eliminar">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    {% endif %}
+                </div>
+            </div>
+        {% endfor %}
+        <div id="no-filtered-contracts-card" class="hidden md:col-span-2 lg:col-span-3 text-center text-gray-500 dark:text-gray-400 mt-6 p-4 border dark:border-gray-700 rounded-md italic">
+            No se encontraron contratos que coincidan con los filtros.
+        </div>
+    {% else %}
+        <p id="no-contracts-card" class="md:col-span-2 lg:col-span-3 text-center text-gray-500 dark:text-gray-400 mt-4 italic">
+            No hay contratos registrados que puedas ver.
+        </p>
+    {% endif %}
+	
+	<div id="cardViewFooterInfo" class="hidden bg-gray-50 dark:bg-gray-700 px-6 py-3 mt-6 rounded-lg shadow">
+	  <p class="text-sm text-gray-700 dark:text-gray-300 text-center">
+		Mostrando <span class="font-medium" id="visibleCardCount">0</span> de <span class="font-medium" id="totalCardCount">0</span> contratos
+	  </p>
+	</div>	
+	
+</div>
+
+<!-- Modal: Crear Contrato Mejorado -->
+<div id="createContractModal" class="fixed inset-0 overflow-y-auto hidden z-50" role="dialog" aria-labelledby="create-modal-title" aria-modal="true">
+  <div class="flex items-end justify-center min-h-screen px-4 pb-20 text-center sm:block sm:p-0">
+    <!-- Backdrop con blur -->
+    <div class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm transition-opacity" aria-hidden="true"></div>
+    
+    <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">​</span>
+
+    <div class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-xl overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl w-full modal-content">
+      <form id="createContractForm"
+            action="{{ url_for('contratos_bp.add_contrato') }}"
+            method="POST" enctype="multipart/form-data"
+            onsubmit="return validateContractModalForm('create', 'createContractErrorMessages')">
+        {{ csrf_form.csrf_token }}
+
+        <!-- Header del Modal -->
+        <div class="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4">
+          <div class="flex items-center justify-between">
+            <h3 id="create-modal-title" class="text-xl font-semibold text-white flex items-center">
+              <i class="fas fa-file-contract mr-3"></i>
+              Nuevo Contrato de Alquiler
+            </h3>
+            <button type="button" onclick="closeModal('createContractModal')" 
+                    class="text-white/80 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-white/50 rounded-lg p-1">
+              <i class="fas fa-times text-xl"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Body del Modal -->
+        <div class="px-6 py-5 max-h-[calc(100vh-200px)] overflow-y-auto modal-body">
+          
+          <!-- Sección 1: Datos Básicos -->
+          <div class="mb-6 bg-blue-50 dark:bg-blue-900/10 rounded-lg p-4 border border-blue-200 dark:border-blue-800/30">
+            <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center">
+              <span class="bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded-full w-7 h-7 flex items-center justify-center mr-3 text-sm font-bold">1</span>
+              Información Básica
+            </h4>
+            
+            <div class="grid grid-cols-12 gap-3 pl-10">
+              <!-- Número de Contrato -->
+              <div class="col-span-12 sm:col-span-6 lg:col-span-4">
+                <label for="contractNumber" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Número de Contrato <span class="text-red-500">*</span>
+                </label>
+                <div class="relative">
+                  <input type="text" name="contractNumber" id="contractNumber" required
+                         class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                         value="{{ suggested_number|default('',true) }}"
+                         placeholder="CONT-2024-001">
+                  <i class="fas fa-hashtag absolute left-2.5 top-2.5 text-gray-400 text-sm"></i>
+                </div>
+              </div>
+
+              <!-- Tipo de Contrato -->
+              <div class="col-span-12 sm:col-span-6 lg:col-span-4">
+                <label for="contractType" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Tipo <span class="text-red-500">*</span>
+                </label>
+                <div class="relative">
+                  <select name="contractType" id="contractType" required
+                          class="form-input w-full pl-8 pr-8 py-2 text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all appearance-none"
+                          onchange="handleContractTypeChange(this.value,'create')">
+                    <option value="Local de Negocio" selected>Local de Negocio</option>
+                    <option value="Vivienda">Vivienda</option>
+                  </select>
+                  <i class="fas fa-building absolute left-2.5 top-2.5 text-gray-400 text-sm"></i>
+                  <i class="fas fa-chevron-down absolute right-2.5 top-2.5 text-gray-400 pointer-events-none text-sm"></i>
+                </div>
+              </div>
+
+              <!-- Estado -->
+              <div class="col-span-12 sm:col-span-6 lg:col-span-4">
+                <label for="contractStatus" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Estado
+                </label>
+                <div class="relative">
+                  <select name="contractStatus" id="contractStatus"
+                          class="form-input w-full pl-8 pr-8 py-2 text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all appearance-none">
+                    <option value="pendiente" selected>Pendiente</option>
+                    <option value="activo">Activo</option>
+                    <option value="cancelado">Cancelado</option>
+                  </select>
+                  <i class="fas fa-flag absolute left-2.5 top-2.5 text-gray-400 text-sm"></i>
+                  <i class="fas fa-chevron-down absolute right-2.5 top-2.5 text-gray-400 pointer-events-none text-sm"></i>
+                </div>
+              </div>
+
+              <!-- Propiedad -->
+              <div class="col-span-12 lg:col-span-6">
+                <label for="contractProperty" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Propiedad <span class="text-red-500">*</span>
+                </label>
+                <div class="relative">
+                  <select name="contractProperty" id="createContractProperty" required class="w-full">
+                      <option value="">   Selecciona o escribe Propiedad --</option>
+                      {% for prop in propiedades %}
+                        <option value="{{prop.id}}" 
+                                data-owner-name="{{prop.propietario_ref.nombre | default('S/P', true) | e}}"
+                                data-display-text="{{prop.direccion}}"> {# Texto principal para TomSelect #}
+                          {{prop.direccion}} {# Este texto es el que ve el usuario si JS falla #}
+                        </option>
+                      {% else %}
+                        <option disabled>No hay propiedades</option>
+                      {% endfor %}
+                  </select>
+                  <i class="fas fa-home absolute left-2.5 top-2.5 text-gray-400 text-sm"></i>
+                  <i class="fas fa-chevron-down absolute right-2.5 top-2.5 text-gray-400 pointer-events-none text-sm"></i>
+                </div>
+              </div>
+
+              <!-- Inquilino -->
+              <div class="col-span-12 lg:col-span-6">
+                <label for="contractTenant" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Inquilino <span class="text-red-500">*</span>
+                </label>
+                <div class="relative">
+                  <select name="contractTenant" id="createContractTenant" required class="w-full">
+                      <option value="">    Selecciona o escribe Inquilino --</option>
+                      {% for t in inquilinos %}
+                        <option value="{{t.id}}" 
+                                data-nif="{{t.nif | default('S/NIF', true) | e}}"
+                                data-display-text="{{t.nombre}}">
+                          {{t.nombre}}
+                        </option>
+                      {% else %}
+                        <option disabled>No hay inquilinos</option>
+                      {% endfor %}
+                  </select>
+                  <i class="fas fa-user absolute left-2.5 top-2.5 text-gray-400 text-sm"></i>
+                  <i class="fas fa-chevron-down absolute right-2.5 top-2.5 text-gray-400 pointer-events-none text-sm"></i>
+                </div>
+              </div>
+
+              <!-- Fecha de Inicio -->
+              <div class="col-span-12 sm:col-span-6 lg:col-span-3">
+                <label for="contractStartDate" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Fecha Inicio <span class="text-red-500">*</span>
+                </label>
+                <div class="relative">
+                  <input type="date" name="contractStartDate" id="contractStartDate" required
+                         class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+                  <i class="fas fa-calendar-alt absolute left-2.5 top-2.5 text-gray-400 text-sm"></i>
+                </div>
+              </div>
+
+              <!-- Fecha de Fin -->
+              <div class="col-span-12 sm:col-span-6 lg:col-span-3">
+                <label for="contractEndDate" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Fecha Fin
+                </label>
+                <div class="relative">
+                  <input type="date" name="contractEndDate" id="contractEndDate"
+                         class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+                  <i class="fas fa-calendar-check absolute left-2.5 top-2.5 text-gray-400 text-sm"></i>
+                </div>
+              </div>
+
+              <!-- Precio Mensual -->
+              <div class="col-span-12 sm:col-span-6 lg:col-span-3">
+                <label for="contractPrice" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Precio Mensual (€) <span class="text-red-500">*</span>
+                </label>
+                <div class="relative">
+                  <input type="number" name="contractPrice" id="contractPrice" required step="0.01" min="0"
+                         class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                         placeholder="0.00">
+                  <i class="fas fa-euro-sign absolute left-2.5 top-2.5 text-gray-400 text-sm"></i>
+                </div>
+              </div>
+
+              <!-- Fianza -->
+              <div class="col-span-12 sm:col-span-6 lg:col-span-3">
+                <label for="contractDeposit" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Fianza (€)
+                </label>
+                <div class="relative">
+                  <input type="number" name="contractDeposit" id="contractDeposit" step="0.01" min="0"
+                         class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                         placeholder="0.00">
+                  <i class="fas fa-shield-alt absolute left-2.5 top-2.5 text-gray-400 text-sm"></i>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sección 2: Serie de Facturación e Impuestos -->
+          <div class="mb-6 bg-purple-50 dark:bg-purple-900/10 rounded-lg p-4 border border-purple-200 dark:border-purple-800/30">
+            <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center">
+              <span class="bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300 rounded-full w-7 h-7 flex items-center justify-center mr-3 text-sm font-bold">2</span>
+              Facturación e Impuestos
+            </h4>
+            
+            <div class="grid grid-cols-12 gap-3 pl-10">
+              <!-- Día de Facturación (MOVIDO AQUÍ) -->
+              <div class="col-span-6 sm:col-span-4 lg:col-span-2">
+                <label for="contractPaymentDay" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Día Facturación
+                </label>
+                <div class="relative">
+                  <input type="number" name="contractPaymentDay" id="contractPaymentDay" value="1" min="1" max="31"
+                         class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all">
+                  <i class="fas fa-calendar-day absolute left-2.5 top-2.5 text-gray-400 text-sm"></i>
+                </div>
+              </div>
+
+              <!-- Serie de Facturación -->
+              <div class="col-span-6 sm:col-span-4 lg:col-span-3">
+                <label for="contractSeriePrefijo" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Prefijo Serie <span class="text-xs text-gray-500">(Opcional)</span>
+                </label>
+                <input type="text" name="contractSeriePrefijo" id="contractSeriePrefijo"
+                       class="form-input w-full px-3 py-2 text-sm rounded-lg" 
+                       placeholder="Ej: F{{ now().year }}-A"
+                       value="Alquiler">
+              </div>
+              
+              <div class="col-span-6 sm:col-span-2 lg:col-span-2">
+                <label for="contractSerieProximoNumero" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Próximo Nº
+                </label>
+                <input type="number" name="contractSerieProximoNumero" id="contractSerieProximoNumero"
+                       min="1" value="1" class="form-input w-full px-3 py-2 text-sm rounded-lg">
+              </div>
+              
+              <div class="col-span-6 sm:col-span-2 lg:col-span-2">
+                <label for="contractSerieFormatoDigitos" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Dígitos
+                </label>
+                <input type="number" name="contractSerieFormatoDigitos" id="contractSerieFormatoDigitos"
+                       min="1" max="10" value="3" class="form-input w-full px-3 py-2 text-sm rounded-lg">
+              </div>
+
+              <!-- Impuestos -->
+              <div class="col-span-12 lg:col-span-3 flex items-center space-x-4 pt-6 lg:pt-0">
+                <label class="flex items-center">
+                  <input type="checkbox" name="contractApplyIVA" id="contractApplyIVA" checked
+                         class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                  <span class="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300">Aplicar IVA</span>
+                </label>
+                
+                <label class="flex items-center">
+                  <input type="checkbox" name="contractApplyIRPF" id="contractApplyIRPF" checked
+                         class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                  <span class="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300">Aplicar IRPF</span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+
+          <!-- Sección 3: Actualización de Renta -->
+          <div class="mb-6 bg-green-50 dark:bg-green-900/10 rounded-lg p-4 border border-green-200 dark:border-green-800/30">
+            <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center">
+              <span class="bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 rounded-full w-7 h-7 flex items-center justify-center mr-3 text-sm font-bold">3</span>
+              Actualización de Renta
+            </h4>
+            
+            <div class="pl-10">
+              <div class="grid grid-cols-12 gap-3">
+                <div class="col-span-12 lg:col-span-6">
+                  <label for="createContractTipoActualizacionRenta" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Tipo de Actualización
+                  </label>
+                  <div class="relative">
+                    <select name="contractTipoActualizacionRenta" id="createContractTipoActualizacionRenta"
+                            class="form-input w-full pl-8 pr-8 py-2 text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all appearance-none"
+                            onchange="toggleRentUpdateFields('create')">
+                      <option value="manual" selected>Manual / Sin Actualización Automática</option>
+                      <option value="indice">Por Índice (IPC/IRAV)</option>
+                      <option value="fijo">Importe Fijo Anual</option>
+                      <option value="indice_mas_fijo">Índice + Importe Fijo Anual</option>
+                    </select>
+                    <i class="fas fa-chart-line absolute left-2.5 top-2.5 text-gray-400 text-sm"></i>
+                    <i class="fas fa-chevron-down absolute right-2.5 top-2.5 text-gray-400 pointer-events-none text-sm"></i>
+                  </div>
+                </div>
+
+                <!-- Campos de índice -->
+				<div id="createIndexFields" class="col-span-12 hidden">
+				  <div class="grid grid-cols-12 gap-3 mt-3">
+					<div class="col-span-6 sm:col-span-3">
+					  <label for="createContractIPC" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Indice General
+					  </label>
+					  <label class="flex items-center h-10 px-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-600 hover:border-green-500 transition-colors cursor-pointer">
+						<input type="checkbox" name="contractIPC" id="createContractIPC"
+							   class="h-4 w-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+							   onchange="handleIndexSelection('ipc','create')">
+						<span class="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300">IPC</span>
+					  </label>
+					</div>
+					
+					<div class="col-span-6 sm:col-span-3">
+					  <label for="createContractIRAV" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+						Vivienda despues 5-2023
+					  </label>
+					  <label class="flex items-center h-10 px-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-600 hover:border-indigo-500 transition-colors cursor-pointer">
+						<input type="checkbox" name="contractIRAV" id="createContractIRAV"
+							   class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+							   onchange="handleIndexSelection('irav','create')">
+						<span class="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300">IRAV</span>
+					  </label>
+					</div>
+
+					<div class="col-span-6 sm:col-span-3">
+					  <label for="createContractIPCYear" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+						Año Ref.
+					  </label>
+					  <input type="number" name="contractIPCYear" id="createContractIPCYear"
+							 min="1901" max="2199" class="form-input w-full px-3 py-2 text-sm rounded-lg h-10">
+					</div>
+
+					<div class="col-span-6 sm:col-span-3">
+					  <label for="createContractIPCMonth" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+						Mes Ref.
+					  </label>
+					  <select name="contractIPCMonth" id="createContractIPCMonth"
+							  class="form-input w-full px-3 py-2 text-sm rounded-lg h-10">
+						<option value="">Mes...</option>
+						{% for m in range(1,13) %}<option value="{{m}}">{{m}}</option>{% endfor %}
+					  </select>
+					</div>
+				  </div>
+				</div>
+
+                <!-- Campo de importe fijo -->
+                <div id="createFixedAmountField" class="col-span-12 lg:col-span-6 hidden">
+                  <label for="createContractImporteActualizacionFija" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Importe Actualización Fija (€)
+                  </label>
+                  <div class="relative">
+                    <input type="number" name="contractImporteActualizacionFija"
+                           id="createContractImporteActualizacionFija" step="0.01"
+                           class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-lg"
+                           placeholder="0.00">
+                    <i class="fas fa-plus-circle absolute left-2.5 top-2.5 text-gray-400 text-sm"></i>
+                  </div>
+                </div>
+
+                <!-- Aplicar retroactivo -->
+                <div id="createRetroactiveApplyField" class="col-span-12 hidden">
+                  <label class="flex items-center p-2.5 bg-amber-50 dark:bg-amber-900/20 rounded-lg mt-3">
+                    <input type="checkbox" name="contractAplicarIndiceRetroactivo"
+                           id="createContractAplicarIndiceRetroactivo"
+                           class="h-4 w-4 text-amber-600 border-gray-300 rounded focus:ring-amber-500">
+                    <span class="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Aplicar índice retroactivamente cuando esté disponible
+                    </span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+
+          <!-- Sección 4: Notas y Documentos -->
+          <div class="mb-6 bg-orange-50 dark:bg-orange-900/10 rounded-lg p-4 border border-orange-200 dark:border-orange-800/30">
+            <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center">
+              <span class="bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300 rounded-full w-7 h-7 flex items-center justify-center mr-3 text-sm font-bold">4</span>
+              Información Adicional
+            </h4>
+            
+            <div class="pl-10 space-y-3">
+              <!-- Notas -->
+              <div>
+                <label for="contractNotes" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Notas del Contrato
+                </label>
+                <textarea name="contractNotes" id="contractNotes" rows="4"
+                          class="form-input w-full px-3 py-2 text-sm rounded-lg"
+                          placeholder="Añade cualquier información adicional relevante..."></textarea>
+              </div>
+
+              <!-- Documentos -->
+              <div>
+                <label for="contractDocuments" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Documentos Adjuntos
+                </label>
+                <div class="relative">
+                  <input type="file" name="contractDocuments" id="createContractDocuments" multiple class="hidden" onchange="updateFileLabel(this, 'createFileLabel')">
+                  <label for="createContractDocuments" id="createFileLabelContainer" class="...tu label estilizado...">
+                      <i class="fas fa-cloud-upload-alt mr-2 text-gray-400"></i>
+                      <span class="text-sm text-gray-600 dark:text-gray-400" id="createFileLabel">
+                          Haz clic para seleccionar archivos
+                      </span>
+                  </label>
+                </div>
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Formatos: PDF, DOC, DOCX, XLS, XLSX, PNG, JPG, GIF
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Mensajes de Error -->
+          <div id="createContractErrorMessages" class="hidden bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
+            <!-- Los errores se insertarán aquí dinámicamente -->
+          </div>
+        </div>
+
+        <!-- Footer del Modal -->
+        <div class="bg-gray-50 dark:bg-gray-900/50 px-6 py-4 flex items-center justify-between border-t border-gray-200 dark:border-gray-700">
+          <div class="text-xs text-gray-500 dark:text-gray-400 flex items-center">
+            <i class="fas fa-info-circle mr-1"></i>
+            Los campos marcados con * son obligatorios
+          </div>
+          <div class="flex space-x-2">
+            <button type="button" onclick="closeModal('createContractModal')"
+                    class="px-4 py-2 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 font-medium text-sm transition-colors flex items-center">
+              <i class="fas fa-times mr-2"></i>
+              Cancelar
+            </button>
+            <button type="submit"
+                    class="px-4 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800 font-medium text-sm transition-all flex items-center shadow hover:shadow-lg">
+              <i class="fas fa-save mr-2"></i>
+              Crear Contrato
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Editar Contrato (estructura similar pero más compacta) -->
+<div id="editContractModal" class="fixed inset-0 overflow-y-auto hidden z-50" role="dialog" aria-labelledby="edit-modal-title" aria-modal="true">
+  <div class="flex items-end justify-center min-h-screen px-4 pb-20 text-center sm:block sm:p-0">
+    <div class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm transition-opacity" aria-hidden="true"></div>
+    <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">​</span>
+    
+    <div class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-xl overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl w-full modal-content">
+      <form id="editContractForm" action="" method="POST" enctype="multipart/form-data" onsubmit="return validateContractModalForm('edit', 'editContractErrorMessages');">
+        {{ csrf_form.csrf_token }}
+        
+        <!-- Header del Modal -->
+        <div class="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4">
+          <div class="flex items-center justify-between">
+            <h3 id="edit-modal-title" class="text-xl font-semibold text-white flex items-center">
+              <i class="fas fa-edit mr-3"></i>
+              Editar Contrato
+            </h3>
+            <button type="button" onclick="closeModal('editContractModal')" 
+                    class="text-white/80 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-white/50 rounded-lg p-1">
+              <i class="fas fa-times text-xl"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Body del Modal -->
+        <div class="px-6 py-5 max-h-[calc(100vh-200px)] overflow-y-auto modal-body">
+          
+          <!-- Sección 1: Datos Básicos -->
+          <div class="mb-6 bg-blue-50 dark:bg-blue-900/10 rounded-lg p-4 border border-blue-200 dark:border-blue-800/30">
+            <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center">
+              <span class="bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded-full w-7 h-7 flex items-center justify-center mr-3 text-sm font-bold">1</span>
+              Información Básica
+            </h4>
+            
+            <div class="grid grid-cols-12 gap-3 pl-10">
+              <!-- Número de Contrato -->
+              <div class="col-span-12 sm:col-span-6 lg:col-span-4">
+                <label for="editContractNumber" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Número de Contrato <span class="text-red-500">*</span>
+                </label>
+                <div class="relative">
+                  <input type="text" name="editContractNumber" id="editContractNumber" required
+                         class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-lg">
+                  <i class="fas fa-hashtag absolute left-2.5 top-2.5 text-gray-400 text-sm"></i>
+                </div>
+              </div>
+
+              <!-- Tipo -->
+              <div class="col-span-12 sm:col-span-6 lg:col-span-3">
+                <label for="editContractType" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Tipo <span class="text-red-500">*</span>
+                </label>
+                <div class="relative">
+                  <select name="editContractType" id="editContractType" required
+                          class="form-input w-full pl-8 pr-8 py-2 text-sm rounded-lg appearance-none"
+                          onchange="handleEditContractTypeChange(this.value)">
+                    <option value="Local de Negocio">Local de Negocio</option>
+                    <option value="Vivienda">Vivienda</option>
+                  </select>
+                  <i class="fas fa-building absolute left-2.5 top-2.5 text-gray-400 text-sm"></i>
+                  <i class="fas fa-chevron-down absolute right-2.5 top-2.5 text-gray-400 pointer-events-none text-sm"></i>
+                </div>
+              </div>
+
+              <!-- Estado -->
+              <div class="col-span-12 sm:col-span-6 lg:col-span-5">
+                <label for="editContractStatus" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Estado
+                </label>
+                <div class="relative">
+                  <select name="editContractStatus" id="editContractStatus"
+                          class="form-input w-full pl-8 pr-8 py-2 text-sm rounded-lg appearance-none">
+                    <option value="pendiente">Pendiente</option>
+                    <option value="activo">Activo</option>
+                    <option value="cancelado">Cancelado</option>
+                    <option value="expirado">Expirado</option>
+                  </select>
+                  <i class="fas fa-flag absolute left-2.5 top-2.5 text-gray-400 text-sm"></i>
+                  <i class="fas fa-chevron-down absolute right-2.5 top-2.5 text-gray-400 pointer-events-none text-sm"></i>
+                </div>
+              </div>
+
+              <!-- Propiedad -->
+              <div class="col-span-12 lg:col-span-6">
+                <label for="editContractProperty" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Propiedad <span class="text-red-500">*</span>
+                </label>
+                <div class="relative">
+                  <select name="editContractProperty" id="editContractProperty" required
+                          class="form-input w-full pl-8 pr-8 py-2 text-sm rounded-lg appearance-none">
+                    <option value="">Seleccionar...</option>
+                    {% for prop in propiedades %}
+                      <option value="{{ prop.id }}">{{ prop.direccion }} ({{ prop.propietario_ref.nombre }})</option>
+                    {% else %}
+                      <option value="" disabled>No hay propiedades</option>
+                    {% endfor %}
+                  </select>
+                  <i class="fas fa-home absolute left-2.5 top-2.5 text-gray-400 text-sm"></i>
+                  <i class="fas fa-chevron-down absolute right-2.5 top-2.5 text-gray-400 pointer-events-none text-sm"></i>
+                </div>
+              </div>
+
+              <!-- Inquilino -->
+              <div class="col-span-12 lg:col-span-6">
+                <label for="editContractTenant" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Inquilino <span class="text-red-500">*</span>
+                </label>
+                <div class="relative">
+                  <select name="editContractTenant" id="editContractTenant" required
+                          class="form-input w-full pl-8 pr-8 py-2 text-sm rounded-lg appearance-none">
+                    <option value="">Seleccionar...</option>
+                    {% for tenant in inquilinos %}
+                      <option value="{{ tenant.id }}">{{ tenant.nombre }}</option>
+                    {% else %}
+                      <option value="" disabled>No hay inquilinos</option>
+                    {% endfor %}
+                  </select>
+                  <i class="fas fa-user absolute left-2.5 top-2.5 text-gray-400 text-sm"></i>
+                  <i class="fas fa-chevron-down absolute right-2.5 top-2.5 text-gray-400 pointer-events-none text-sm"></i>
+                </div>
+              </div>
+
+              <!-- Fechas -->
+              <div class="col-span-12 sm:col-span-6 lg:col-span-3">
+                <label for="editContractStartDate" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Fecha Inicio <span class="text-red-500">*</span>
+                </label>
+                <div class="relative">
+                  <input type="date" name="editContractStartDate" id="editContractStartDate" required
+                         class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-lg">
+                  <i class="fas fa-calendar-alt absolute left-2.5 top-2.5 text-gray-400 text-sm"></i>
+                </div>
+              </div>
+
+              <div class="col-span-12 sm:col-span-6 lg:col-span-3">
+                <label for="editContractEndDate" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Fecha Fin
+                </label>
+                <div class="relative">
+                  <input type="date" name="editContractEndDate" id="editContractEndDate"
+                         class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-lg">
+                  <i class="fas fa-calendar-check absolute left-2.5 top-2.5 text-gray-400 text-sm"></i>
+                </div>
+              </div>
+
+              <!-- Precio y Fianza -->
+              <div class="col-span-12 sm:col-span-6 lg:col-span-3">
+                <label for="editContractPrice" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Precio (€) <span class="text-red-500">*</span>
+                </label>
+                <div class="relative">
+                  <input type="number" name="editContractPrice" id="editContractPrice" required 
+                         step="0.01" min="0"
+                         class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-lg">
+                  <i class="fas fa-euro-sign absolute left-2.5 top-2.5 text-gray-400 text-sm"></i>
+                </div>
+              </div>
+
+              <div class="col-span-12 sm:col-span-6 lg:col-span-3">
+                <label for="editContractDeposit" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Fianza (€)
+                </label>
+                <div class="relative">
+                  <input type="number" name="editContractDeposit" id="editContractDeposit" 
+                         step="0.01" min="0"
+                         class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-lg">
+                  <i class="fas fa-shield-alt absolute left-2.5 top-2.5 text-gray-400 text-sm"></i>
+                </div>
+              </div>
+            </div>
+          </div>	
+
+          <!-- Sección 2: Serie de Facturación e Impuestos (Edit) -->
+          <div class="mb-6 bg-purple-50 dark:bg-purple-900/10 rounded-lg p-4 border border-purple-200 dark:border-purple-800/30">
+            <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center">
+              <span class="bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300 rounded-full w-7 h-7 flex items-center justify-center mr-3 text-sm font-bold">2</span>
+              Facturación e Impuestos
+            </h4>
+            
+            <div class="grid grid-cols-12 gap-3 pl-10">
+              <!-- Día de Facturación (MOVIDO AQUÍ) -->
+              <div class="col-span-6 sm:col-span-4 lg:col-span-2">
+                <label for="editContractPaymentDay" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Día Facturación
+                </label>
+                <div class="relative">
+                  <input type="number" name="editContractPaymentDay" id="editContractPaymentDay" 
+                         value="1" min="1" max="31"
+                         class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all">
+                  <i class="fas fa-calendar-day absolute left-2.5 top-2.5 text-gray-400 text-sm"></i>
+                </div>
+              </div>
+
+              <!-- Serie de Facturación -->
+              <div class="col-span-12 sm:col-span-6 lg:col-span-4">
+                <label for="editContractSeriePrefijo" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Prefijo Serie
+                </label>
+                <input type="text" name="editContractSeriePrefijo" id="editContractSeriePrefijo"
+                       class="form-input w-full px-3 py-2 text-sm rounded-lg" placeholder="Ej: F-A">
+              </div>
+              
+              <div class="col-span-6 sm:col-span-3 lg:col-span-2">
+                <label for="editContractSerieProximoNumero" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Próximo Nº
+                </label>
+                <input type="number" name="editContractSerieProximoNumero" id="editContractSerieProximoNumero"
+                       min="1" class="form-input w-full px-3 py-2 text-sm rounded-lg">
+              </div>
+              
+              <div class="col-span-6 sm:col-span-3 lg:col-span-2">
+                <label for="editContractSerieFormatoDigitos" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Dígitos
+                </label>
+                <input type="number" name="editContractSerieFormatoDigitos" id="editContractSerieFormatoDigitos"
+                       min="1" max="10" class="form-input w-full px-3 py-2 text-sm rounded-lg">
+              </div>
+
+              <div class="col-span-12 lg:col-span-4 flex items-center space-x-4 pt-6 lg:pt-0">
+                <label class="flex items-center">
+                  <input id="editContractApplyIVA" name="editContractApplyIVA" type="checkbox"
+                         class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                  <span class="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300">Aplicar IVA</span>
+                </label>
+                
+                <label class="flex items-center">
+                  <input id="editContractApplyIRPF" name="editContractApplyIRPF" type="checkbox"
+                         class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                  <span class="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300">Aplicar IRPF</span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+
+
+          <!-- Sección 3: Actualización de Renta (Edit) -->
+          <div class="mb-6 bg-green-50 dark:bg-green-900/10 rounded-lg p-4 border border-green-200 dark:border-green-800/30">
+            <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center">
+              <span class="bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 rounded-full w-7 h-7 flex items-center justify-center mr-3 text-sm font-bold">3</span>
+              Actualización de Renta
+            </h4>
+            
+            <div class="pl-10">
+              <div class="grid grid-cols-12 gap-3">
+                <div class="col-span-12 lg:col-span-6">
+                  <label for="editContractTipoActualizacionRenta" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Tipo de Actualización
+                  </label>
+                  <div class="relative">
+                    <select name="editContractTipoActualizacionRenta" id="editContractTipoActualizacionRenta"
+                            class="form-input w-full pl-8 pr-8 py-2 text-sm rounded-lg appearance-none"
+                            onchange="toggleRentUpdateFields('edit')">
+                      <option value="manual">Manual / Sin Actualización Automática</option>
+                      <option value="indice">Por Índice (IPC/IRAV)</option>
+                      <option value="fijo">Importe Fijo Anual</option>
+                      <option value="indice_mas_fijo">Índice + Importe Fijo Anual</option>
+                    </select>
+                    <i class="fas fa-chart-line absolute left-2.5 top-2.5 text-gray-400 text-sm"></i>
+                    <i class="fas fa-chevron-down absolute right-2.5 top-2.5 text-gray-400 pointer-events-none text-sm"></i>
+                  </div>
+                </div>
+
+                <div id="editIndexFields" class="col-span-12 hidden">
+                  <div class="grid grid-cols-12 gap-3 mt-3">
+                    <div class="col-span-6 sm:col-span-3">
+                      <label for="editContractIPC" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Indice General
+                      </label>
+                      <label class="flex items-center h-10 px-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-600 hover:border-green-500 transition-colors cursor-pointer">
+                        <input type="checkbox" name="editContractIPC" id="editContractIPC"
+                               class="h-4 w-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                               onchange="handleIndexSelection('ipc', 'edit')">
+                        <span class="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300">IPC</span>
+                      </label>
+                    </div>
+                    
+                    <div class="col-span-6 sm:col-span-3">
+                      <label for="editContractIRAV" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Vivienda despues 5-2023
+                      </label>
+                      <label class="flex items-center h-10 px-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-600 hover:border-indigo-500 transition-colors cursor-pointer">
+                        <input type="checkbox" name="editContractIRAV" id="editContractIRAV"
+                               class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                               onchange="handleIndexSelection('irav', 'edit')">
+                        <span class="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300">IRAV</span>
+                      </label>
+                    </div>
+
+                    <div class="col-span-6 sm:col-span-3">
+                      <label for="editContractIPCYear" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Año Ref.
+                      </label>
+                      <input type="number" name="editContractIPCYear" id="editContractIPCYear"
+                             min="1901" max="2199" class="form-input w-full px-3 py-2 text-sm rounded-lg h-10">
+                    </div>
+
+                    <div class="col-span-6 sm:col-span-3">
+                      <label for="editContractIPCMonth" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Mes Ref.
+                      </label>
+                      <select name="editContractIPCMonth" id="editContractIPCMonth"
+                              class="form-input w-full px-3 py-2 text-sm rounded-lg h-10">
+                        <option value="">Mes...</option>
+                        {% for m in range(1, 13) %}<option value="{{ m }}">{{ m }}</option>{% endfor %}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <div id="editFixedAmountField" class="col-span-12 lg:col-span-6 hidden">
+                  <label for="editContractImporteActualizacionFija" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Importe Actualización Fija (€)
+                  </label>
+                  <div class="relative">
+                    <input type="number" name="editContractImporteActualizacionFija" 
+                           id="editContractImporteActualizacionFija" step="0.01"
+                           class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-lg">
+                    <i class="fas fa-plus-circle absolute left-2.5 top-2.5 text-gray-400 text-sm"></i>
+                  </div>
+                </div>
+
+                <div id="editRetroactiveApplyField" class="col-span-12 hidden">
+                  <label class="flex items-center p-2.5 bg-amber-50 dark:bg-amber-900/20 rounded-lg mt-3">
+                    <input type="checkbox" name="editContractAplicarIndiceRetroactivo"
+                           id="editContractAplicarIndiceRetroactivo"
+                           class="h-4 w-4 text-amber-600 border-gray-300 rounded focus:ring-amber-500">
+                    <span class="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Aplicar índice retroactivamente cuando esté disponible
+                    </span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+
+          <!-- Sección 4: Notas y Documentos (Edit) -->
+          <div class="mb-6 bg-orange-50 dark:bg-orange-900/10 rounded-lg p-4 border border-orange-200 dark:border-orange-800/30">
+            <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center">
+              <span class="bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300 rounded-full w-7 h-7 flex items-center justify-center mr-3 text-sm font-bold">4</span>
+              Información Adicional
+            </h4>
+            
+            <div class="pl-10 space-y-3">
+              <div>
+                <label for="editContractNotes" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Notas
+                </label>
+                <textarea name="editContractNotes" id="editContractNotes" rows="4"
+                          class="form-input w-full px-3 py-2 text-sm rounded-lg"></textarea>
+              </div>
+              
+              <div>
+                <label for="editContractDocuments" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Añadir Documentos
+                </label>
+                <div class="relative">
+                  <input type="file" name="editContractDocuments" id="editContractDocuments" multiple
+                         class="hidden" onchange="updateFileLabel(this, 'editFileLabel')">
+                  <label for="editContractDocuments"
+                         class="flex items-center justify-center w-full px-4 py-2.5 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-all">
+                    <i class="fas fa-cloud-upload-alt mr-2 text-gray-400"></i>
+                    <span class="text-sm text-gray-600 dark:text-gray-400" id="editFileLabel">
+                      Haz clic para seleccionar archivos
+                    </span>
+                  </label>
+                </div>
+              </div>
+              
+              <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Documentos Adjuntos
+                </label>
+                <div id="editCurrentDocsList" class="space-y-1 max-h-32 overflow-y-auto"></div>
+              </div>
+            </div>
+          </div>
+          
+          <div id="editContractErrorMessages" class="hidden bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
+            <!-- Los errores se insertarán aquí dinámicamente -->
+          </div>
+        </div>
+        
+        <!-- Footer del Modal -->
+        <div class="bg-gray-50 dark:bg-gray-900/50 px-6 py-4 flex items-center justify-between border-t border-gray-200 dark:border-gray-700">
+          <div class="text-xs text-gray-500 dark:text-gray-400 flex items-center">
+            <i class="fas fa-info-circle mr-1"></i>
+            Los campos marcados con * son obligatorios
+          </div>
+          <div class="flex space-x-2">
+            <button type="button" onclick="closeModal('editContractModal')"
+                    class="px-4 py-2 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 font-medium text-sm transition-colors flex items-center">
+              <i class="fas fa-times mr-2"></i>
+              Cancelar
+            </button>
+            <button type="submit"
+                    class="px-4 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800 font-medium text-sm transition-all flex items-center shadow hover:shadow-lg">
+              <i class="fas fa-save mr-2"></i>
+              Guardar Cambios
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Confirmar Eliminación -->
+<div id="deleteContractModal" class="fixed inset-0 overflow-y-auto hidden z-50">
+  <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+    <div class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm transition-opacity" aria-hidden="true"></div>
+    <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">​</span>
+    
+    <div class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+      <div class="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+        <div class="sm:flex sm:items-start">
+          <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 dark:bg-red-900/20 sm:mx-0 sm:h-10 sm:w-10">
+            <i class="fas fa-exclamation-triangle text-red-600 dark:text-red-400"></i>
+          </div>
+          <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+            <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white">Eliminar contrato</h3>
+            <div class="mt-2">
+              <p class="text-sm text-gray-500 dark:text-gray-400">
+                ¿Estás seguro de que deseas eliminar este contrato? Se eliminarán también todas las facturas, documentos y gastos asociados. Esta acción no se puede deshacer.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+        <button type="button" class="confirm-delete-button w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm">
+          Eliminar
+        </button>
+        <button type="button" onclick="closeModal('deleteContractModal')" 
+                class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-800 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+          Cancelar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+
+
+
+{% block scripts %}
+<script>
+  let idToDelete = null;
+  const uiState = { currentView: 'table' };
+  const csrfTokenGlobal = "{{ csrf_form.csrf_token._value() }}";
+
+  // Instancias de TomSelect (globales en este script)
+  let createPropertyTomSelect, createTenantTomSelect;
+  let editPropertyTomSelect, editTenantTomSelect;
+
+  // Configuración común para TomSelect de Propiedades
+  const propertyTomSelectConfig = {
+    create: false,
+    placeholder: '-- Selecciona o escribe Propiedad --',
+    searchField: ['text', 'data-owner-name'], 
+    valueField: 'value',
+    labelField: 'text',
+    sortField: 'text',
+    maxItems: 1,
+    render: {
+      option: function(data, escape) {
+        let ownerName = data['data-owner-name'] || '';
+        return `<div class="py-2 px-3">
+                  <div class="font-medium">${escape(data.text)}</div>
+                  ${ownerName ? '<div class="text-xs text-gray-500 dark:text-gray-400 option-property-owner">Propietario: ' + escape(ownerName) + '</div>' : ''}
+                </div>`;
+      },
+      item: function(data, escape) {
+        return `<div>${escape(data.text)}</div>`;
+      }
+    }
+  };
+
+  // Configuración común para TomSelect de Inquilinos
+  const tenantTomSelectConfig = {
+    create: false,
+    placeholder: '-- Selecciona o escribe Inquilino --',
+    searchField: ['text', 'data-nif'],
+    valueField: 'value',
+    labelField: 'text',
+    sortField: 'text',
+    maxItems: 1,
+    render: {
+      option: function(data, escape) {
+        let tenantNif = data['data-nif'] || '';
+        return `<div class="py-2 px-3">
+                  <div class="font-medium">${escape(data.text)}</div>
+                  ${tenantNif ? '<div class="text-xs text-gray-500 dark:text-gray-400 option-tenant-nif">NIF: ' + escape(tenantNif) + '</div>' : ''}
+                </div>`;
+      },
+      item: function(data, escape) {
+        return `<div>${escape(data.text)}</div>`;
+      }
+    }
+  };
+  
+	function initializeTomSelectInstance(elementId, config) {
+		const selectElement = document.getElementById(elementId);
+		if (selectElement && typeof TomSelect !== 'undefined') {
+			if (selectElement.tomselect) { 
+				selectElement.tomselect.destroy();
+			}
+			
+			// Obtener el icono del HTML original
+			const parentDiv = selectElement.closest('.relative');
+			const icon = parentDiv ? parentDiv.querySelector('.fas:not(.fa-chevron-down)') : null;
+			const iconClass = icon ? icon.className : '';
+			
+			const options = Array.from(selectElement.options).map(opt => {
+				if (!opt.value && (opt.disabled || opt.textContent.trim().startsWith('--'))) return null;
+				return {
+					value: opt.value,
+					text: opt.dataset.displayText || opt.textContent.trim(), 
+					'data-owner-name': opt.dataset.ownerName, 
+					'data-nif': opt.dataset.nif 
+				};
+			}).filter(opt => opt !== null && opt.value !== "");
+
+			const finalConfig = { 
+				...config, 
+				options: options.length > 0 ? options : undefined,
+				render: {
+					...config.render,
+					option: function(data, escape) {
+						let ownerName = data['data-owner-name'] || '';
+						let tenantNif = data['data-nif'] || '';
+						let subtextHtml = '';
+						
+						if (ownerName) {
+							subtextHtml = `<div class="text-xs text-gray-500 dark:text-gray-400 option-property-owner" style="text-align: left !important;">Propietario: ${escape(ownerName)}</div>`;
+						} else if (tenantNif) {
+							subtextHtml = `<div class="text-xs text-gray-500 dark:text-gray-400 option-tenant-nif" style="text-align: left !important;">NIF: ${escape(tenantNif)}</div>`;
+						}
+						
+						return `<div style="text-align: left !important; width: 100% !important;">
+								  <div class="font-medium" style="text-align: left !important;">${escape(data.text)}</div>
+								  ${subtextHtml}
+								</div>`;
+					},
+					item: function(data, escape) {
+						return `<div style="text-align: left !important; width: 100% !important;">${escape(data.text)}</div>`;
+					}
+				},
+				onInitialize: function() {
+					// Añadir icono y flecha al control después de la inicialización
+					const control = this.control;
+					
+					// Limpiar cualquier flecha existente de TomSelect
+					const existingArrows = control.querySelectorAll('::after, ::before, .ts-dropdown-indicator');
+					existingArrows.forEach(arrow => {
+						if (arrow && arrow.remove) arrow.remove();
+					});
+					
+					// Añadir icono si existe
+					if (iconClass) {
+						const iconElement = document.createElement('i');
+						iconElement.className = iconClass;
+						control.appendChild(iconElement);
+						control.classList.add('has-icon');
+					}
+					
+
+					
+					// Forzar alineación izquierda del contenido
+					const controlDiv = control.querySelector('div');
+					if (controlDiv) {
+						controlDiv.style.textAlign = 'left';
+						controlDiv.style.justifyContent = 'flex-start';
+					}
+				}
+			};
+			
+			return new TomSelect(selectElement, finalConfig);
+		}
+		console.warn(`TomSelect no pudo inicializarse para #${elementId}`);
+		return null;
+	}
+  
+  // Funciones de UI Modales (asumiendo que showModal, closeModal, confirmDeleteWithToken están en base.html)
+  // Si no, debes definirlas aquí o importarlas de alguna manera.
+
+  // --- Funciones Específicas para Contratos ---
+  function deleteContract(id) {
+    idToDelete = id;
+    const modal = document.getElementById('deleteContractModal');
+    if (!modal) { console.error("Modal 'deleteContractModal' no encontrado"); return; }
+    const confirmBtn = modal.querySelector('.confirm-delete-button');
+    if (!confirmBtn) { console.error("Botón de confirmación '.confirm-delete-button' no encontrado"); return; }
+
+    confirmBtn.onclick = function() {
+        const url = `{{ url_for('contratos_bp.delete_contrato', id=0) }}`.replace('0', idToDelete);
+        // Asumiendo que confirmDeleteWithToken está definida globalmente (en base.html)
+        if (typeof confirmDeleteWithToken === 'function') {
+            confirmDeleteWithToken('deleteContractModal', url, csrfTokenGlobal);
+        } else {
+            console.error("Función confirmDeleteWithToken no encontrada.");
+            // Fallback simple si no existe la función global
+            closeModal('deleteContractModal');
+            const form = document.createElement('form'); form.method = 'POST'; form.action = url;
+            const csrfInput = document.createElement('input'); csrfInput.type = 'hidden'; csrfInput.name = 'csrf_token'; csrfInput.value = csrfTokenGlobal;
+            form.appendChild(csrfInput); document.body.appendChild(form); form.submit();
+        }
+    };
+    if (typeof showModal === 'function') showModal('deleteContractModal');
+    else console.error("Función showModal no encontrada.");
+  }
+
+  function viewContract(id) {
+    window.location.href = `{{ url_for('contratos_bp.ver_contrato', id=0) }}`.replace('0', id);
+  }
+  
+	function showCreateContractModal() {
+		console.log(">>> showCreateContractModal INICIO");
+		try {
+			const form = document.getElementById('createContractForm');
+			if (!form) { console.error("Form createContractForm no encontrado"); return; }
+			form.reset(); 
+			
+			const createDocsInput = document.getElementById('createContractDocuments');
+			if (createDocsInput) {
+				updateFileLabel(createDocsInput, 'createFileLabel');
+			}
+
+			// Destruir TomSelect existentes
+			if (window.createPropertyTomSelect) {
+				window.createPropertyTomSelect.destroy();
+				window.createPropertyTomSelect = null;
+			}
+			if (window.createTenantTomSelect) {
+				window.createTenantTomSelect.destroy();
+				window.createTenantTomSelect = null;
+			}
+			
+			document.getElementById('createContractProperty').value = ""; 
+			document.getElementById('createContractTenant').value = ""; 
+
+			// Crear nuevas instancias y mantener referencias globales
+			window.createPropertyTomSelect = initializeTomSelectInstance('createContractProperty', propertyTomSelectConfig);
+			window.createTenantTomSelect = initializeTomSelectInstance('createContractTenant', tenantTomSelectConfig);
+			
+			// Agregar listeners de validación a los TomSelect
+			if (window.createPropertyTomSelect) {
+				window.createPropertyTomSelect.on('change', () => validateContractModalForm('create', 'createContractErrorMessages'));
+			}
+			if (window.createTenantTomSelect) {
+				window.createTenantTomSelect.on('change', () => validateContractModalForm('create', 'createContractErrorMessages'));
+			}
+			
+			// Resetear otros campos
+			document.getElementById('createContractTipoActualizacionRenta').value = 'manual';
+			document.getElementById('createContractIPC').checked = false;
+			document.getElementById('createContractIRAV').checked = false;
+			document.getElementById('createContractIPCYear').value = '';
+			document.getElementById('createContractIPCMonth').value = '';
+			document.getElementById('createContractImporteActualizacionFija').value = '';
+			document.getElementById('createContractAplicarIndiceRetroactivo').checked = false;
+			
+			toggleRentUpdateFields('create');
+			const errorDiv = document.getElementById('createContractErrorMessages');
+			if(errorDiv) { errorDiv.innerHTML = ''; errorDiv.classList.add('hidden'); }
+			
+			// Validar inmediatamente
+			setTimeout(() => {
+				validateContractModalForm('create', 'createContractErrorMessages');
+			}, 100);
+			
+			if (typeof showModal === 'function') showModal('createContractModal');
+			else console.error("Función showModal no encontrada.");
+		} catch (e) { console.error("Error en showCreateContractModal:", e); }
+	}
+
+	function editContract(button) {
+		console.log(">>> editContract INICIO");
+		try {
+			const row = button.closest('.contract-row');
+			if (!row) { console.error("Fila de contrato no encontrada."); return; }
+			const data = row.dataset;
+			const contractId = data.id;
+
+			const editForm = document.getElementById('editContractForm');
+			if (!editForm) { console.error("Formulario editContractForm no encontrado."); return; }
+			editForm.action = `{{ url_for('contratos_bp.edit_contrato', id=0) }}`.replace('0', contractId);
+
+			// Llenar campos básicos
+			document.getElementById('editContractNumber').value = data.numeroContrato || "";
+			document.getElementById('editContractType').value = data.tipo || "Local de Negocio";
+			
+			// Destruir TomSelect existentes
+			if (window.editPropertyTomSelect) {
+				window.editPropertyTomSelect.destroy();
+				window.editPropertyTomSelect = null;
+			}
+			if (window.editTenantTomSelect) {
+				window.editTenantTomSelect.destroy();
+				window.editTenantTomSelect = null;
+			}
+
+			// Configurar valores de los selects antes de inicializar TomSelect
+			const propSelectEdit = document.getElementById('editContractProperty');
+			const tenantSelectEdit = document.getElementById('editContractTenant');
+
+			if (propSelectEdit) propSelectEdit.value = data.propiedadId || "";
+			if (tenantSelectEdit) tenantSelectEdit.value = data.inquilinoId || "";
+
+			// Crear nuevas instancias TomSelect
+			window.editPropertyTomSelect = initializeTomSelectInstance('editContractProperty', propertyTomSelectConfig);
+			window.editTenantTomSelect = initializeTomSelectInstance('editContractTenant', tenantTomSelectConfig);
+
+			// Establecer valores en TomSelect después de la inicialización
+			if (window.editPropertyTomSelect && data.propiedadId) {
+				window.editPropertyTomSelect.setValue(data.propiedadId, true);
+			}
+			if (window.editTenantTomSelect && data.inquilinoId) {
+				window.editTenantTomSelect.setValue(data.inquilinoId, true);
+			}
+
+			// Agregar listeners de validación
+			if (window.editPropertyTomSelect) {
+				window.editPropertyTomSelect.on('change', () => validateContractModalForm('edit', 'editContractErrorMessages'));
+			}
+			if (window.editTenantTomSelect) {
+				window.editTenantTomSelect.on('change', () => validateContractModalForm('edit', 'editContractErrorMessages'));
+			}
+
+			// Llenar resto de campos
+			document.getElementById('editContractStartDate').value = data.fechaInicio || "";
+			document.getElementById('editContractEndDate').value = data.fechaFin || "";
+			document.getElementById('editContractPrice').value = data.precioMensual || "";
+			document.getElementById('editContractDeposit').value = data.deposito || "0";
+			document.getElementById('editContractPaymentDay').value = data.diaPago || "1";
+			document.getElementById('editContractStatus').value = data.estado || "pendiente";
+			document.getElementById('editContractNotes').value = data.notas || "";
+			document.getElementById('editContractApplyIVA').checked = (data.aplicarIva === 'true');
+			document.getElementById('editContractApplyIRPF').checked = (data.aplicarIrpf === 'true');
+			document.getElementById('editContractTipoActualizacionRenta').value = data.tipoActualizacionRenta || 'manual';
+			document.getElementById('editContractIPC').checked = (data.actualizaIpc === 'true');
+			document.getElementById('editContractIRAV').checked = (data.actualizaIrav === 'true');
+			document.getElementById('editContractIPCYear').value = data.ipcAnoInicio || "";
+			document.getElementById('editContractIPCMonth').value = data.ipcMesInicio || "";
+			document.getElementById('editContractImporteActualizacionFija').value = data.importeActualizacionFija || "";
+			document.getElementById('editContractAplicarIndiceRetroactivo').checked = (data.aplicarIndiceRetroactivo === 'true');
+			document.getElementById('editContractSeriePrefijo').value = data.serieFacturacionPrefijo || "";
+			
+			// Cálculo del próximo número de serie
+			const prefijoGuardado = data.serieFacturacionPrefijo || "";
+			const editSerieProximoNumEl = document.getElementById('editContractSerieProximoNumero');
+			if (editSerieProximoNumEl) {
+				let proximoNumeroParaDisplayEdit = 1; 
+				const ultimoNumeroGuardadoEnContrato = parseInt(data.serieFacturacionUltimoNumero || "0");
+				const anoSerieGuardadoEnContrato = parseInt(data.serieFacturacionAnoActual || "0");    
+				const fechaInicioContratoStr = document.getElementById('editContractStartDate').value || data.fechaInicio || '';
+				let anoDeReferenciaActualDelContrato = new Date().getFullYear(); 
+				if (fechaInicioContratoStr && fechaInicioContratoStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+					try { anoDeReferenciaActualDelContrato = parseInt(fechaInicioContratoStr.substring(0, 4)); } catch(e) {}
+				}
+				if (prefijoGuardado.trim() && !isNaN(ultimoNumeroGuardadoEnContrato) && !isNaN(anoSerieGuardadoEnContrato) && anoSerieGuardadoEnContrato > 0) { 
+					if (anoSerieGuardadoEnContrato === anoDeReferenciaActualDelContrato) {
+						proximoNumeroParaDisplayEdit = ultimoNumeroGuardadoEnContrato + 1;
+					}
+				}
+				editSerieProximoNumEl.value = proximoNumeroParaDisplayEdit;
+			}
+			document.getElementById('editContractSerieFormatoDigitos').value = data.serieFacturacionFormatoDigitos || "4";
+
+			handleEditContractTypeChange(document.getElementById('editContractType').value);
+			toggleRentUpdateFields('edit');
+
+			// Manejo de documentos existentes
+			const docsContainer = document.getElementById('editCurrentDocsList');
+			if (docsContainer) {
+				docsContainer.innerHTML = ""; 
+				editForm.querySelectorAll('input[name="removeDocumentIds"]').forEach(inp => inp.remove());
+				try {
+					const docs = JSON.parse(data.documentos || "[]");
+					if (Array.isArray(docs) && docs.length > 0) {
+						docs.forEach(doc => {
+							const docDiv = document.createElement("div");
+							docDiv.className = "flex items-center justify-between bg-gray-50 dark:bg-gray-700 p-2 rounded";
+							const fileUrl = `/contratos/uploads/contracts/${encodeURIComponent(doc.filename || 'error.file')}`;
+							docDiv.innerHTML = `
+								<a href="${fileUrl}" target="_blank" class="text-sm text-blue-600 dark:text-blue-400 hover:underline truncate mr-2 flex items-center">
+								   <i class="fas fa-paperclip mr-1 text-xs"></i>
+								   ${doc.original_filename || 'Archivo sin nombre'}
+								</a>
+								<button type="button" class="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 text-sm p-1" 
+										onclick="markDocumentForRemoval(this, ${doc.id})" title="Marcar para eliminar">
+								   <i class="fas fa-times"></i>
+								</button>
+							`;
+							docsContainer.appendChild(docDiv);
+						});
+					} else {
+						docsContainer.innerHTML = `<p class="text-xs text-gray-500 dark:text-gray-400 italic">No hay documentos adjuntos.</p>`;
+					}
+				} catch (error) { 
+					console.error("Error parseando documentos:", error); 
+					if(docsContainer) docsContainer.innerHTML = `<p class="text-xs text-red-500 dark:text-red-400 italic">Error al cargar documentos.</p>`; 
+				}
+			}
+			
+			const editDocsInput = document.getElementById('editContractDocuments');
+			if (editDocsInput) {
+				updateFileLabel(editDocsInput, 'editFileLabel');
+			}
+			
+			const errorDivEdit = document.getElementById('editContractErrorMessages');
+			if(errorDivEdit) { errorDivEdit.innerHTML = ''; errorDivEdit.classList.add('hidden'); }
+			
+			// Validar después de un pequeño delay para asegurar que TomSelect esté listo
+			setTimeout(() => {
+				validateContractModalForm('edit', 'editContractErrorMessages');
+			}, 100);
+			
+			if (typeof showModal === 'function') showModal('editContractModal');
+			else console.error("Función showModal no encontrada.");
+		} catch (e) { console.error("Error en editContract:", e); }
+	}
+  
+  function markDocumentForRemoval(button, docId) {
+    const editForm = document.getElementById('editContractForm');
+    if (!editForm) return;
+    let existingInput = editForm.querySelector(`input[name="removeDocumentIds"][value="${docId}"]`);
+    const docDiv = button.closest("div.flex"); // El div que contiene el enlace y el botón
+
+    if (existingInput) { // Si ya está marcado, desmarcar
+        existingInput.remove();
+        if (docDiv) {
+            docDiv.style.opacity = '1'; docDiv.style.textDecoration = 'none';
+            docDiv.classList.remove('bg-red-50', 'dark:bg-red-900/20');
+            const span = docDiv.querySelector('span.text-red-600');
+            if(span) span.remove();
+            button.disabled = false; button.classList.remove('cursor-not-allowed');
+            button.innerHTML = '<i class="fas fa-times"></i>'; button.title = "Marcar para eliminar";
+            button.setAttribute('onclick', `markDocumentForRemoval(this, ${docId})`); // Restaurar onclick original
+        }
+        console.log("Documento ID", docId, "DESMARCADO para eliminación.");
+    } else { // Si no está marcado, marcar
+        const hiddenInput = document.createElement("input");
+        hiddenInput.type = "hidden"; hiddenInput.name = "removeDocumentIds"; hiddenInput.value = docId;
+        editForm.appendChild(hiddenInput);
+        if (docDiv) {
+            docDiv.style.opacity = '0.5'; docDiv.style.textDecoration = 'line-through';
+            docDiv.classList.add('bg-red-50', 'dark:bg-red-900/20');
+            button.disabled = true; // Deshabilitar para evitar confusión, o cambiar el onclick
+            // Opcional: cambiar el botón para que sea un "undo"
+            // button.innerHTML = '<i class="fas fa-undo"></i>'; button.title = "Deshacer marcado";
+            // button.setAttribute('onclick', `undoMarkDocumentForRemoval(this, ${docId})`); // Necesitarías esta función
+            const span = document.createElement('span');
+            span.className = 'text-xs text-red-600 dark:text-red-400 ml-2';
+            span.textContent = '(Se eliminará al guardar)';
+            docDiv.appendChild(span); // Añadir al final del div del documento
+        }
+        console.log("Documento ID", docId, "marcado para eliminación.");
+    }
+  }
+
+  // (Si decides implementar undoMarkDocumentForRemoval, iría aquí)
+
+  function handleIndexSelection(selected, formPrefix) {
+    const ipc = document.getElementById(`${formPrefix}ContractIPC`);
+    const irav = document.getElementById(`${formPrefix}ContractIRAV`);
+    if (!ipc || !irav) return;
+    if (selected === 'ipc' && ipc.checked) irav.checked = false;
+    if (selected === 'irav' && irav.checked) ipc.checked = false;
+  }
+
+  function handleContractTypeChange(tipo, formPrefix) {
+    const iva = document.getElementById(`${formPrefix}ContractApplyIVA`);
+    const irpf = document.getElementById(`${formPrefix}ContractApplyIRPF`);
+    if (!iva || !irpf) return;
+    if (tipo === 'Vivienda') { iva.checked = false; irpf.checked = false; }
+    else { iva.checked = true; irpf.checked = true; }
+  }
+  function handleEditContractTypeChange(selectedType) { handleContractTypeChange(selectedType, 'edit'); }
+
+  function toggleRentUpdateFields(formPrefix) {
+    const tipoSelect = document.getElementById(`${formPrefix}ContractTipoActualizacionRenta`);
+    const idxDiv = document.getElementById(`${formPrefix}IndexFields`);
+    const fixedDiv = document.getElementById(`${formPrefix}FixedAmountField`);
+    const retroDiv = document.getElementById(`${formPrefix}RetroactiveApplyField`);
+    if (!tipoSelect || !idxDiv || !fixedDiv || !retroDiv) {console.warn("Elementos para toggleRentUpdateFields no encontrados para", formPrefix); return;}
+    idxDiv.classList.add('hidden'); fixedDiv.classList.add('hidden'); retroDiv.classList.add('hidden');
+    switch (tipoSelect.value) {
+      case 'indice': idxDiv.classList.remove('hidden'); retroDiv.classList.remove('hidden'); break;
+      case 'fijo': fixedDiv.classList.remove('hidden'); break;
+      case 'indice_mas_fijo': idxDiv.classList.remove('hidden'); fixedDiv.classList.remove('hidden'); retroDiv.classList.remove('hidden'); break;
+    }
+  }
+
+
+	// Función para hacer clickeable toda la fila/tarjeta
+	function makeContractsClickable() {
+	  // Para las filas de la tabla
+	  document.querySelectorAll('#contractsTable tr.contract-row').forEach(row => {
+		row.style.cursor = 'pointer';
+		row.addEventListener('click', (e) => {
+		  // Evitar que se active cuando se hace click en los botones de acción
+		  if (e.target.closest('button') || e.target.closest('a')) return;
+		  const contractId = row.dataset.id;
+		  if (contractId) viewContract(contractId);
+		});
+	  });
+
+	  // Para las tarjetas
+	  document.querySelectorAll('#cardView div.contract-card').forEach(card => {
+		card.style.cursor = 'pointer';
+		card.addEventListener('click', (e) => {
+		  // Evitar que se active cuando se hace click en los botones de acción
+		  if (e.target.closest('button') || e.target.closest('a')) return;
+		  const contractId = card.dataset.id;
+		  if (contractId) viewContract(contractId);
+		});
+	  });
+	}
+
+
+function validateContractModalForm(formPrefix, errorContainerId) {
+    let isValid = true;
+    const messages = [];
+    const errorContainer = document.getElementById(errorContainerId || `${formPrefix}ContractErrorMessages`);
+    
+    if (errorContainer) { 
+        errorContainer.innerHTML = ''; 
+        errorContainer.classList.add('hidden');
+    }
+
+    function addError(fieldElement, message) {
+        if (fieldElement) {
+            // Para TomSelect, aplicar error al wrapper
+            const tsWrapper = fieldElement.closest('.ts-wrapper');
+            if (tsWrapper) {
+                tsWrapper.classList.add('error');
+                const tsControl = tsWrapper.querySelector('.ts-control');
+                if (tsControl) {
+                    tsControl.classList.add('border-red-500');
+                }
+            } else {
+                // Para inputs normales
+                fieldElement.classList.add('border-red-500', 'focus:ring-red-500', 'focus:border-red-500');
+                fieldElement.classList.remove('border-gray-300', 'focus:ring-blue-500', 'focus:border-blue-500');
+            }
+        }
+        if (!messages.includes(message)) messages.push(message);
+        isValid = false;
+    }
+    
+    function clearError(fieldElement) {
+        if (fieldElement) {
+            // Para TomSelect, limpiar error del wrapper
+            const tsWrapper = fieldElement.closest('.ts-wrapper');
+            if (tsWrapper) {
+                tsWrapper.classList.remove('error');
+                const tsControl = tsWrapper.querySelector('.ts-control');
+                if (tsControl) {
+                    tsControl.classList.remove('border-red-500');
+                }
+            } else {
+                // Para inputs normales
+                fieldElement.classList.remove('border-red-500', 'focus:ring-red-500', 'focus:border-red-500');
+                fieldElement.classList.add('border-gray-300', 'focus:ring-blue-500', 'focus:border-blue-500');
+            }
+        }
+    }
+
+    // Validar campos obligatorios
+    const fieldsToValidate = [
+        { id: `${formPrefix}ContractNumber`, name: "Número de Contrato" },
+        { id: `${formPrefix}ContractProperty`, name: "Propiedad" },
+        { id: `${formPrefix}ContractTenant`, name: "Inquilino" },
+        { id: `${formPrefix}ContractStartDate`, name: "Fecha de Inicio" },
+        { id: `${formPrefix}ContractPrice`, name: "Precio Mensual" }
+    ];
+    
+    fieldsToValidate.forEach(field => {
+        const el = document.getElementById(field.id);
+        if (el) {
+            let value = el.value;
+            
+            // Para TomSelect, obtener el valor de manera especial
+            if (el.tomselect) {
+                value = el.tomselect.getValue();
+            }
+            
+            if (!value || (typeof value === 'string' && !value.trim())) { 
+                addError(el, `${field.name} es obligatorio.`); 
+            } else { 
+                clearError(el); 
+            }
+        }
+    });
+
+    // Resto de validaciones (actualización de renta, serie facturación, etc.)
+    const tipoActEl = document.getElementById(`${formPrefix}ContractTipoActualizacionRenta`);
+    const ipcChkEl = document.getElementById(`${formPrefix}ContractIPC`);
+    const iravChkEl = document.getElementById(`${formPrefix}ContractIRAV`);
+    const ipcYearEl = document.getElementById(`${formPrefix}ContractIPCYear`);
+    const ipcMonthEl = document.getElementById(`${formPrefix}ContractIPCMonth`);
+    const importeFijoEl = document.getElementById(`${formPrefix}ContractImporteActualizacionFija`);
+    
+    if (tipoActEl && ipcChkEl && iravChkEl && ipcYearEl && ipcMonthEl && importeFijoEl) {
+        const tipoAct = tipoActEl.value;
+        if (tipoAct === 'indice' || tipoAct === 'indice_mas_fijo') {
+            if (!ipcChkEl.checked && !iravChkEl.checked) {
+                addError(null, "Debe seleccionar IPC o IRAV para actualización por índice.");
+            }
+            if (ipcChkEl.checked && iravChkEl.checked) {
+                addError(null, "No puede seleccionar IPC e IRAV simultáneamente.");
+            }
+            if (!ipcYearEl.value.trim() || !ipcMonthEl.value.trim()) {
+                if (!ipcYearEl.value.trim()) addError(ipcYearEl, "Año de referencia del índice es obligatorio.");
+                if (!ipcMonthEl.value.trim()) addError(ipcMonthEl, "Mes de referencia del índice es obligatorio.");
+            } else { 
+                clearError(ipcYearEl); 
+                clearError(ipcMonthEl); 
+            }
+        }
+        if (tipoAct === 'fijo' || tipoAct === 'indice_mas_fijo') {
+            if (!importeFijoEl.value.trim()) {
+                addError(importeFijoEl, "Importe de actualización fija es obligatorio.");
+            } else {
+                clearError(importeFijoEl);
+            }
+        }
+    }
+
+    // Mostrar errores si los hay
+    if (!isValid && errorContainer) {
+        errorContainer.innerHTML = `
+            <div class="flex items-start">
+                <i class="fas fa-exclamation-triangle text-red-500 mr-2 mt-0.5"></i>
+                <div>
+                    <p class="font-medium text-red-800 dark:text-red-200 mb-1">Por favor, corrige los errores:</p>
+                    <ul class="list-disc list-inside text-sm text-red-700 dark:text-red-300 space-y-0.5">
+                        ${messages.map(msg => `<li>${msg}</li>`).join('')}
+                    </ul>
+                </div>
+            </div>
+        `;
+        errorContainer.classList.remove('hidden');
+    }
+
+    // Habilitar/deshabilitar botón submit
+    const submitButton = document.querySelector(`#${formPrefix}ContractForm button[type="submit"]`);
+    if (submitButton) { 
+        submitButton.disabled = !isValid; 
+        submitButton.classList.toggle('opacity-50', !isValid); 
+        submitButton.classList.toggle('cursor-not-allowed', !isValid); 
+    }
+    
+    return isValid;
+}
+
+	function updateFileLabel(inputElement, labelId) {
+		const label = document.getElementById(labelId);
+		if (!label) {
+			console.warn(`Label con ID '${labelId}' no encontrado para actualizar.`);
+			return;
+		}
+		// Comprobar si el inputElement existe ANTES de acceder a .files
+		if (!inputElement) {
+			console.warn(`Input de archivo no encontrado al llamar a updateFileLabel (ID del input esperado en HTML podría ser incorrecto o faltar). Label ID: ${labelId}`);
+			// No cambiar el texto del label si el input no se encuentra, o poner un mensaje de error genérico en el label
+			// label.textContent = 'Error: Input de archivo no encontrado.';
+			return;
+		}
+
+		const files = inputElement.files;
+		if (files.length === 0) {
+			label.textContent = 'Haz clic para seleccionar archivos';
+		} else if (files.length === 1) {
+			label.textContent = files[0].name;
+		} else {
+			label.textContent = `${files.length} archivos seleccionados`;
+		}
+	}
+
+	function applyContractFilters() {
+	  const searchTerm = document.getElementById('contractSearch').value.toLowerCase();
+	  const activeFilterBtn = document.querySelector('.filter-btn.bg-blue-600');
+	  const statusFilter = activeFilterBtn ? activeFilterBtn.getAttribute('data-filter') : 'all';
+	  const ownerFilter = document.getElementById('ownerFilter').value;
+	  let visibleCountTable = 0;
+	  let visibleCountCard = 0;
+	  const totalContracts = document.querySelectorAll('#contractsTable tr.contract-row').length;
+
+	  const shouldShowElement = (elementData) => {
+		const numeroContrato = (elementData.numeroContrato || '').toLowerCase();
+		const tipoContrato = (elementData.tipo || '').toLowerCase();
+		const propiedadDireccion = elementData.propiedadDireccion ? elementData.propiedadDireccion.toLowerCase() : '';
+		const inquilinoNombre = elementData.inquilinoNombre ? elementData.inquilinoNombre.toLowerCase() : '';
+		const text = numeroContrato + ' ' + tipoContrato + ' ' + propiedadDireccion + ' ' + inquilinoNombre;
+		const rowStatus = elementData.estado;
+		const rowOwnerId = elementData.propietarioId;
+		
+		let show = true;
+		if (searchTerm && !text.includes(searchTerm)) show = false;
+		if (show && statusFilter !== 'all' && rowStatus !== statusFilter) show = false;
+		if (show && ownerFilter !== 'all' && rowOwnerId !== ownerFilter) show = false;
+		return show;
+	  };
+
+	  // Filtrar filas de la tabla
+	  document.querySelectorAll('#contractsTable tr.contract-row').forEach(row => {
+		const show = shouldShowElement(row.dataset);
+		row.style.display = show ? "" : "none";
+		if(show) visibleCountTable++;
+	  });
+
+	  // Filtrar tarjetas
+	  document.querySelectorAll('#cardView div.contract-card').forEach(card => {
+		const show = shouldShowElement(card.dataset);
+		card.style.display = show ? "" : "none";
+		if(show) visibleCountCard++;
+	  });
+
+	  // Actualizar contadores
+	  const visibleTableCountEl = document.getElementById('visibleTableCount');
+	  const totalTableCountEl = document.getElementById('totalTableCount');
+	  const visibleCardCountEl = document.getElementById('visibleCardCount');
+	  const totalCardCountEl = document.getElementById('totalCardCount');
+	  
+	  if (visibleTableCountEl) visibleTableCountEl.textContent = visibleCountTable;
+	  if (totalTableCountEl) totalTableCountEl.textContent = totalContracts;
+	  if (visibleCardCountEl) visibleCardCountEl.textContent = visibleCountCard;
+	  if (totalCardCountEl) totalCardCountEl.textContent = totalContracts;
+	  
+	  // Mostrar/ocultar mensajes de "no hay resultados"
+	  document.getElementById('no-filtered-contracts-row').style.display = 
+		(totalContracts > 0 && visibleCountTable === 0) ? '' : 'none';
+	  document.getElementById('no-filtered-contracts-card').style.display = 
+		(totalContracts > 0 && visibleCountCard === 0) ? 'block' : 'none';
+	  document.getElementById('no-contracts-row').style.display = 
+		(totalContracts === 0) ? '' : 'none';
+	  
+	  const noContractsCard = document.getElementById('no-contracts-card');
+	  if (noContractsCard) {
+		noContractsCard.style.display = (totalContracts === 0) ? 'block' : 'none';
+	  }
+	}
+
+	// Actualizar la función toggleView
+	function toggleView(view) {
+	  const tableView = document.getElementById('tableView');
+	  const cardView = document.getElementById('cardView');
+	  const tableBtn = document.getElementById('tableViewBtn');
+	  const cardBtn = document.getElementById('cardViewBtn');
+	  const cardViewFooter = document.getElementById('cardViewFooterInfo');
+	  
+	  if (!tableView || !cardView || !tableBtn || !cardBtn) return;
+
+	  if (view === 'table') {
+		tableView.classList.remove("hidden");
+		cardView.classList.add("hidden");
+		if (cardViewFooter) cardViewFooter.classList.add("hidden");
+		
+		tableBtn.classList.add('bg-white', 'dark:bg-gray-700', 'text-blue-600', 'dark:text-blue-400');
+		tableBtn.classList.remove('bg-gray-100', 'dark:bg-gray-800', 'text-gray-700', 'dark:text-gray-300');
+		cardBtn.classList.add('bg-gray-100', 'dark:bg-gray-800', 'text-gray-700', 'dark:text-gray-300');
+		cardBtn.classList.remove('bg-white', 'dark:bg-gray-700', 'text-blue-600', 'dark:text-blue-400');
+		uiState.currentView = 'table';
+	  } else {
+		tableView.classList.add("hidden");
+		cardView.classList.remove("hidden");
+		if (cardViewFooter) cardViewFooter.classList.remove("hidden");
+		
+		cardBtn.classList.add('bg-white', 'dark:bg-gray-700', 'text-blue-600', 'dark:text-blue-400');
+		cardBtn.classList.remove('bg-gray-100', 'dark:bg-gray-800', 'text-gray-700', 'dark:text-gray-300');
+		tableBtn.classList.add('bg-gray-100', 'dark:bg-gray-800', 'text-gray-700', 'dark:text-gray-300');
+		tableBtn.classList.remove('bg-white', 'dark:bg-gray-700', 'text-blue-600', 'dark:text-blue-400');
+		uiState.currentView = 'card';
+	  }
+	  
+	  // Guardar preferencia
+	  localStorage.setItem('contractView', view);
+	  
+	  // Aplicar filtros para actualizar contadores
+	  applyContractFilters();
+	}  
+
+  function setActiveFilter(button) {
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+      btn.classList.remove('bg-blue-600', 'text-white', 'dark:bg-blue-500', 'dark:text-white');
+      btn.classList.add('bg-white', 'text-gray-700', 'dark:bg-gray-800', 'dark:text-gray-300');
+    });
+    button.classList.add('bg-blue-600', 'text-white', 'dark:bg-blue-500', 'dark:text-white');
+    button.classList.remove('bg-white', 'text-gray-700', 'dark:bg-gray-800', 'dark:text-gray-300');
+    applyContractFilters();
+  }
+
+	document.addEventListener('DOMContentLoaded', () => {
+		// Establecer filtro por defecto
+		const defaultFilterButton = document.querySelector('.filter-btn[data-filter="all"]');
+		if (defaultFilterButton) setActiveFilter(defaultFilterButton);
+		
+		// Establecer vista desde localStorage o usar tabla por defecto
+		toggleView(localStorage.getItem('contractView') || 'table');
+
+		// Configurar campos de actualización de renta para el formulario de creación
+		const createTipoActSelect = document.getElementById('createContractTipoActualizacionRenta');
+		if (createTipoActSelect) {
+			toggleRentUpdateFields('create'); 
+			validateContractModalForm('create', 'createContractErrorMessages'); 
+		}
+		
+		// Configurar validación en tiempo real para ambos formularios
+		['create', 'edit'].forEach(formPrefix => {
+			const form = document.getElementById(`${formPrefix}ContractForm`);
+			if (form) {
+				form.querySelectorAll(
+					`input:not(#${formPrefix}ContractProperty):not(#${formPrefix}ContractTenant), 
+					 select:not(#${formPrefix}ContractProperty):not(#${formPrefix}ContractTenant):not(#${formPrefix}ContractTipoActualizacionRenta):not(#${formPrefix}ContractIPCMonth), 
+					 textarea`
+				).forEach(input => {
+					input.addEventListener('input', () => validateContractModalForm(formPrefix, `${formPrefix}ContractErrorMessages`));
+					input.addEventListener('change', () => validateContractModalForm(formPrefix, `${formPrefix}ContractErrorMessages`));
+				});
+				
+				// Agregar listeners específicos para TomSelect
+				const propertyTomSelect = window[`${formPrefix}PropertyTomSelect`];
+				const tenantTomSelect = window[`${formPrefix}TenantTomSelect`];
+		  
+				if (propertyTomSelect) {
+					propertyTomSelect.on('change', () => validateContractModalForm(formPrefix, `${formPrefix}ContractErrorMessages`));
+				}
+				if (tenantTomSelect) {
+					tenantTomSelect.on('change', () => validateContractModalForm(formPrefix, `${formPrefix}ContractErrorMessages`));
+				}
+			}
+		});
+
+		// Listener para actualizar serie de facturación cuando cambia la fecha de inicio en edición
+		const editStartDateInput = document.getElementById('editContractStartDate');
+		if (editStartDateInput) {
+			editStartDateInput.addEventListener('change', function() {
+				const editForm = this.closest('form');
+				if (!editForm || !editForm.action) return;
+				const contractIdBeingEdited = editForm.action.split('/').pop();
+				const contractRow = document.querySelector(`.contract-row[data-id="${contractIdBeingEdited}"]`);
+				if (contractRow) {
+					const data = contractRow.dataset;
+					const prefijoGuardado = data.serieFacturacionPrefijo || "";
+					const ultimoNumero = parseInt(data.serieFacturacionUltimoNumero || "0");
+					const anoSerieOriginal = parseInt(data.serieFacturacionAnoActual || "0");
+					const nuevaFechaInicio = this.value;
+					let anoNuevoInicio = new Date().getFullYear(); 
+					if (nuevaFechaInicio && nuevaFechaInicio.match(/^\d{4}-\d{2}-\d{2}$/)) {
+						anoNuevoInicio = parseInt(nuevaFechaInicio.substring(0, 4));
+					}
+					const proximoNumInput = document.getElementById('editContractSerieProximoNumero');
+					if (proximoNumInput && prefijoGuardado.trim()) {
+						if (anoSerieOriginal === anoNuevoInicio) {
+							proximoNumInput.value = ultimoNumero + 1;
+						} else {
+							proximoNumInput.value = 1; 
+						}
+					}
+				}
+			});
+		}
+		
+		// NUEVO: Hacer clickeables los contratos
+		makeContractsClickable();
+		
+		// NUEVO: Aplicar filtros iniciales para mostrar contadores correctos
+		applyContractFilters();
+		
+		// NUEVO: Verificar si venimos con un parámetro para editar
+		const urlParams = new URLSearchParams(window.location.search);
+		const editId = urlParams.get('edit');
+		
+		if (editId) {
+			// Buscar el contrato en la tabla o tarjetas
+			setTimeout(() => {
+				// Primero buscar en las filas de la tabla
+				const contractRow = document.querySelector(`.contract-row[data-id="${editId}"]`);
+				if (contractRow) {
+					const editBtn = contractRow.querySelector('button[onclick*="editContract"]');
+					if (editBtn) {
+						editBtn.click();
+					} else {
+						// Si no hay botón, simular el click llamando directamente a editContract
+						editContract(contractRow.querySelector('button') || contractRow);
+					}
+				} else {
+					// Si no encuentra la fila, intentar buscar la tarjeta
+					const contractCard = document.querySelector(`.contract-card[data-id="${editId}"]`);
+					if (contractCard) {
+						const editBtn = contractCard.querySelector('button[onclick*="editContract"]');
+						if (editBtn) {
+							editBtn.click();
+						} else {
+							// Si no hay botón, simular el click
+							editContract(contractCard.querySelector('button') || contractCard);
+						}
+					}
+				}
+				
+				// Limpiar el parámetro de la URL sin recargar la página
+				const newUrl = window.location.pathname;
+				window.history.replaceState({}, document.title, newUrl);
+			}, 100); // Pequeño delay para asegurar que todo esté cargado
+		}
+	});  
+</script>
+{% endblock %}				  

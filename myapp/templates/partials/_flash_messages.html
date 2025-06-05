@@ -1,0 +1,19 @@
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        <div class="mb-4 space-y-2">
+        {% for category, message in messages %}
+            <div class="p-4 rounded-md text-sm border
+                {% if category == 'danger' %} bg-red-100 border-red-400 text-red-700 dark:bg-red-900 dark:text-red-200 dark:border-red-700
+                {% elif category == 'success' %} bg-green-100 border-green-400 text-green-700 dark:bg-green-900 dark:text-green-200 dark:border-green-700
+                {% elif category == 'warning' %} bg-yellow-100 border-yellow-400 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-200 dark:border-yellow-700
+                {% else %} bg-blue-100 border-blue-400 text-blue-700 dark:bg-blue-900 dark:text-blue-200 dark:border-blue-700 {% endif %}"
+                role="alert">
+                <span class="font-medium">
+                    {% if category == 'danger' %}Error:{% elif category == 'success' %}Éxito:{% elif category == 'warning' %}Aviso:{% else %}Info:{% endif %}
+                </span>
+                {{ message }}
+            </div>
+        {% endfor %}
+        </div>
+    {% endif %}
+{% endwith %}

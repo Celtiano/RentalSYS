@@ -1,0 +1,128 @@
+{% extends 'base.html' %}
+
+    {% block title %}{{ title }}{% endblock %}
+    {% block header_title %}{{ title }}{% endblock %}
+
+    {% block content %}
+    <div class="max-w-2xl mx-auto bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <h2 class="text-xl font-semibold text-gray-800 dark:text-gray-100 mb-6">Editar Usuario: {{ user.username }}</h2>
+
+        {# Mostrar errores de validación flash #}
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+            <div class="mb-4 space-y-2">
+                {% for category, message in messages %}
+                {% if category == 'danger' %}
+                <div class="bg-red-100 dark:bg-red-900/30 border-l-4 border-red-500 text-red-700 dark:text-red-300 p-3 rounded-md" role="alert">
+                    <p>{{ message }}</p>
+                </div>
+                {% endif %}
+                {% endfor %}
+            </div>
+            {% endif %}
+        {% endwith %}
+
+        {# El action se establece en la ruta, no aquí #}
+        <form action="{{ url_for('admin_users_bp.edit_user', id=user.id) }}" method="POST" novalidate>
+            {{ form.csrf_token }}
+
+            <div class="space-y-3">
+                {# Username (Readonly si no quieres permitir cambiarlo) #}
+                <div>
+                    {{ form.username.label(class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1") }}
+                    {{ form.username(class="form-input w-full pl-1" + (" border-red-500" if form.username.errors else "")) }}
+                    {% if form.username.errors %}
+                        <p class="text-red-500 text-xs mt-1">{{ form.username.errors[0] }}</p>
+                    {% endif %}
+                </div>
+                 {# Email #}
+                 <div>
+                    {{ form.email.label(class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1") }}
+                    {{ form.email(class="form-input w-full pl-1" + (" border-red-500" if form.email.errors else "")) }}
+                    {% if form.email.errors %}
+                        <p class="text-red-500 text-xs mt-1">{{ form.email.errors[0] }}</p>
+                    {% endif %}
+                </div>
+                {# Password (Opcional) #}
+                 <div>
+                    {{ form.password.label(class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1") }}
+                    {{ form.password(class="form-input w-full pl-1" + (" border-red-500" if form.password.errors else ""), placeholder="Dejar vacío para no cambiar") }}
+                    {% if form.password.errors %}
+                        <p class="text-red-500 text-xs mt-1">{{ form.password.errors[0] }}</p>
+                    {% endif %}
+                </div>
+                 {# Confirm Password (Opcional) #}
+                 <div>
+                    {{ form.confirm_password.label(class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1") }}
+                    {{ form.confirm_password(class="form-input w-full pl-1" + (" border-red-500" if form.confirm_password.errors else "")) }}
+                    {% if form.confirm_password.errors %}
+                        <p class="text-red-500 text-xs mt-1">{{ form.confirm_password.errors[0] }}</p>
+                    {% endif %}
+                </div>
+                {# Rol #}
+                <div>
+                    {{ form.role.label(class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1") }}
+                    {{ form.role(class="form-input w-full pl-1" + (" border-red-500" if form.role.errors else "")) }}
+                    {% if form.role.errors %}
+                        <p class="text-red-500 text-xs mt-1">{{ form.role.errors[0] }}</p>
+                    {% endif %}
+                </div>
+                {# Activo #}
+                <div class="flex items-center">
+                    {{ form.is_active(class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500") }}
+                    {{ form.is_active.label(class="ml-2 block text-sm text-gray-900 dark:text-gray-300") }}
+                </div>
+                {# Propietarios Asignados #}
+                 <div id="propietariosEditField" class="pt-2">
+                    {{ form.propietarios.label(class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1") }}
+                     <div class="border dark:border-gray-600 rounded-md p-2 max-h-40 overflow-y-auto space-y-1">
+                         {% if form.propietarios.choices %}
+                            {# Usamos el renderizador por defecto de WTForms que maneja los 'checked' basado en form.propietarios.data #}
+                            {% for subfield in form.propietarios %}
+                                <div class="flex items-center">
+                                    {{ subfield(class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500") }}
+                                    {{ subfield.label(class="ml-2 block text-sm text-gray-900 dark:text-gray-300") }}
+                                </div>
+                            {% endfor %}
+                         {% else %}
+                             <p class="text-sm italic text-gray-500 dark:text-gray-400">No hay propietarios para asignar.</p>
+                         {% endif %}
+                     </div>
+                    {% if form.propietarios.errors %}
+                        <p class="text-red-500 text-xs mt-1">{{ form.propietarios.errors[0] }}</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="mt-6 pt-4 border-t dark:border-gray-700 flex justify-end space-x-3">
+                <a href="{{ url_for('admin_users_bp.list_users') }}" class="bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-md border dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 text-sm">
+                    Cancelar
+                </a>
+                {{ form.submit(class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm") }}
+            </div>
+        </form>
+    </div>
+    {% endblock %}
+
+    {% block scripts %}
+    <script>
+        // Ocultar/mostrar campo propietarios según el rol seleccionado al editar
+        const roleEditSelect = document.getElementById('role'); // Mismo ID que en create
+        const propietariosEditField = document.getElementById('propietariosEditField');
+
+        function toggleEditPropietariosField() {
+            if (roleEditSelect && propietariosEditField) {
+                if (roleEditSelect.value === 'admin') {
+                    propietariosEditField.style.display = 'none';
+                } else {
+                    propietariosEditField.style.display = 'block';
+                }
+            }
+        }
+        if(roleEditSelect) {
+            roleEditSelect.addEventListener('change', toggleEditPropietariosField);
+            // Llamar al inicio para establecer el estado correcto al cargar
+            toggleEditPropietariosField();
+        }
+    </script>
+    {% endblock %}

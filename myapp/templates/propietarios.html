@@ -1,0 +1,1756 @@
+{% extends 'base.html' %}
+
+{% block title %}Propietarios - RentalSys{% endblock %}
+{% block header_title %}Propietarios{% endblock %}
+
+{% block content %}
+<!-- CONTENEDOR PRINCIPAL CON ALTURA COMPLETA -->
+<div class="h-full flex flex-col overflow-hidden">
+    <!-- HEADER FIJO -->
+    <div class="flex-shrink-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-30">
+        <!-- Título y botones -->
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6 p-6 pb-4">
+            <h2 class="text-2xl font-semibold text-gray-800 dark:text-gray-100 mb-4 md:mb-0">🏠 Gestión de Propietarios</h2>
+            <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+                {% if current_user.is_authenticated and (current_user.role == 'admin' or current_user.role == 'gestor') %}
+                    <button onclick="showCreateOwnerModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md flex items-center focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+                        <i class="fas fa-plus mr-2"></i> Nuevo propietario
+                    </button>
+                {% endif %}
+                <!-- BÚSQUEDA MEJORADA -->
+                <div class="flex space-x-2">
+                    <div class="relative">
+                        <input type="text" id="ownerSearch" placeholder="Buscar por nombre, NIF, email..." class="form-input pl-10 pr-4 py-2 border border-gray-300 rounded-md w-full focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200" onkeyup="searchOwners()">
+                        <div class="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+                            <i class="fas fa-search"></i>
+                        </div>
+                    </div>
+                    <select id="searchFilter" class="form-input px-3 py-2 border border-gray-300 rounded-md focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200" onchange="searchOwners()">
+                        <option value="all">Todos los campos</option>
+                        <option value="nombre">Solo nombre</option>
+                        <option value="nif">Solo NIF</option>
+                        <option value="email">Solo email</option>
+                        <option value="telefono">Solo teléfono</option>
+                    </select>
+                    <button onclick="clearSearch()" class="px-3 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-md transition-colors" title="Limpiar búsqueda">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- CONTADOR DE RESULTADOS -->
+        <div id="searchResults" class="mb-4 px-6 pb-4 text-sm text-gray-600 dark:text-gray-400 hidden">
+            <i class="fas fa-info-circle mr-1"></i>Mostrando <span id="visibleCount">0</span> de <span id="totalCount">0</span> propietarios
+        </div>
+    </div>
+
+    <!-- CONTENEDOR DE TABLA CON SCROLL -->
+    <div class="flex-1 overflow-hidden">
+        <div class="h-full bg-white dark:bg-gray-800 rounded-lg shadow mx-6 mb-6 overflow-hidden">
+            <!-- TABLA CON SCROLL INDEPENDIENTE -->
+            <div class="h-full overflow-y-auto">
+                <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                    <thead class="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Nombre</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">DNI/NIF</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Teléfono</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Email</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Propiedades</th>
+                            {% if current_user.is_authenticated and (current_user.role == 'admin' or current_user.role == 'gestor') %}
+                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Acciones</th>
+                            {% endif %}
+                        </tr>
+                    </thead>
+                    <tbody id="ownersTable" class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                        {% if propietarios %}
+                            {% for owner in propietarios %}
+                            <tr class="highlight-row owner-row hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                                data-id="{{ owner.id }}"
+                                data-nombre="{{ owner.nombre | e }}"
+                                data-nif="{{ owner.nif | e }}"
+                                data-direccion="{{ owner.direccion | default('', true) | e }}"
+                                data-cp="{{ owner.codigo_postal | default('', true) | e }}"
+                                data-poblacion="{{ owner.ciudad | default('', true) | e }}"
+                                data-telefono="{{ owner.telefono | default('', true) | e }}"
+                                data-email="{{ owner.email | default('', true) | e }}"
+                                data-iban="{{ owner.cuenta_bancaria | default('', true) | e }}"
+                                data-pie_factura="{{ owner.pie_factura | default('', true) | e }}"
+                                data-documentos_ruta_base="{{ owner.documentos_ruta_base | default('', true) | e }}" 
+                            >
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="flex items-center">
+                                        <div class="flex-shrink-0 h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center">
+                                            <i class="fas fa-user-tie text-blue-600 dark:text-blue-400"></i>
+                                        </div>
+                                        <div class="ml-4">
+                                            <div class="text-sm font-medium text-gray-900 dark:text-white owner-nombre">{{ owner.nombre }}</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm text-gray-500 dark:text-gray-400 owner-nif">{{ owner.nif | default('-') }}</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm text-gray-500 dark:text-gray-400 owner-telefono">{{ owner.telefono | default('-') }}</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <a href="mailto:{{ owner.email }}" class="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 hover:underline owner-email" title="Enviar email a {{ owner.email }}">
+                                        {{ owner.email | default('-') }}
+                                    </a>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300">
+                                        {{ owner.propiedades | length }}
+                                    </span>
+                                </td>
+                                {% if current_user.is_authenticated and (current_user.role == 'admin' or current_user.role == 'gestor') %}
+                                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+                                        <button onclick="editOwner(this)" class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300" title="Editar">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <!-- BOTÓN DE IMPORTACIÓN MEJORADO -->
+                                        <button onclick="fetchAssetsForOwner('{{ owner.nif }}', '{{ owner.nombre | e }}')" 
+                                                class="text-teal-600 hover:text-teal-900 dark:text-teal-400 dark:hover:text-teal-300 transition-colors transform hover:scale-110" 
+                                                title="Importar propiedades/inquilinos desde BD Fiscal para {{ owner.nombre }}">
+                                            <i class="fas fa-cloud-download-alt"></i>
+                                        </button>
+                                        <button onclick="deleteOwner({{ owner.id }})" class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300" title="Eliminar">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
+                                 {% endif %}
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr id="noResultsRow">
+                                <td colspan="{{ 6 if current_user.is_authenticated and (current_user.role == 'admin' or current_user.role == 'gestor') else 5 }}"
+                                    class="px-6 py-8 whitespace-nowrap text-center text-sm text-gray-500 dark:text-gray-400">
+                                    <div class="flex flex-col items-center space-y-2">
+                                        <i class="fas fa-user-tie text-3xl text-gray-300 dark:text-gray-600"></i>
+                                        {% if current_user.role == 'admin' %}
+                                            <p>No hay propietarios registrados.</p>
+                                            <p class="text-xs">Puedes crear uno usando el botón "Nuevo propietario"</p>
+                                        {% else %}
+                                            <p>No tienes propietarios asignados o no hay propietarios registrados.</p>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Crear Propietario -->
+<div id="createOwnerModal" class="fixed inset-0 overflow-y-auto hidden z-50" role="dialog" aria-labelledby="create-owner-modal-title" aria-modal="true">
+    <div class="flex items-end justify-center min-h-screen px-4 pb-20 text-center sm:block sm:p-0">
+        <!-- Backdrop con blur -->
+        <div class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm transition-opacity" aria-hidden="true"></div>
+        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">​</span>
+        
+        <div class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-xl overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl w-full modal-content">
+            <form id="createOwnerForm" action="{{ url_for('propietarios_bp.add_propietario') }}" method="POST" novalidate>
+                {{ form.csrf_token }}
+                
+                <!-- Header del Modal -->
+                <div class="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4">
+                    <div class="flex items-center justify-between">
+                        <h3 id="create-owner-modal-title" class="text-xl font-semibold text-white flex items-center">
+                            <i class="fas fa-user-plus mr-3"></i>
+                            Nuevo Propietario
+                        </h3>
+                        <button type="button" onclick="closeModal('createOwnerModal')" 
+                                class="text-white/80 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-white/50 rounded-lg p-1">
+                            <i class="fas fa-times text-xl"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Body del Modal -->
+                <div class="px-6 py-4 max-h-[calc(100vh-200px)] overflow-y-auto modal-body">
+                    <div class="space-y-3">
+                        <!-- NIF con búsqueda externa -->
+                        <div class="flex items-stretch">
+                            <div class="relative flex-1">
+                                {{ form.nif(class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-l-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all h-10" + (" border-red-500 dark:border-red-600" if form.nif.errors else ""), id="create_nif", placeholder="NIF/CIF *") }}
+                                <i class="fas fa-id-card absolute left-2.5 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm"></i>
+                            </div>
+                            <button type="button" onclick="fetchExternalOwnerDataFromGeneralDB()" 
+                                    class="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-4 py-2 rounded-r-lg text-sm flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all shadow hover:shadow-lg"
+                                    title="Buscar y autocompletar desde BD GENERAL">
+                                <i class="fas fa-database mr-1"></i>
+                                <span class="hidden sm:inline">Buscar</span>
+                            </button>
+                        </div>
+                        <div id="externalLookupStatus" class="text-xs mt-1 min-h-[1.2em] transition-all duration-300"></div>
+                        {% if form.nif.errors %}<p class="text-red-500 text-xs mt-1">{{ form.nif.errors[0] }}</p>{% endif %}
+
+                        <!-- Nombre -->
+                        <div class="relative">
+                            {{ form.nombre(class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all h-10" + (" border-red-500 dark:border-red-600" if form.nombre.errors else ""), id="create_nombre", placeholder="Nombre completo *") }}
+                            <i class="fas fa-user absolute left-2.5 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm"></i>
+                        </div>
+                        {% if form.nombre.errors %}<p class="text-red-500 text-xs mt-1">{{ form.nombre.errors[0] }}</p>{% endif %}
+
+                        <!-- Dirección -->
+                        <div class="relative">
+                            {{ form.direccion(class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all h-10" + (" border-red-500 dark:border-red-600" if form.direccion.errors else ""), id="create_direccion", placeholder="Dirección completa") }}
+                            <i class="fas fa-map-marker-alt absolute left-2.5 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm"></i>
+                        </div>
+                        {% if form.direccion.errors %}<p class="text-red-500 text-xs mt-1">{{ form.direccion.errors[0] }}</p>{% endif %}
+                        
+                        <!-- Código Postal y Ciudad -->
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                            <div class="relative">
+                                {{ form.codigo_postal(class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all h-10" + (" border-red-500 dark:border-red-600" if form.codigo_postal.errors else ""), id="create_codigo_postal", placeholder="C.P.") }}
+                                <i class="fas fa-mail-bulk absolute left-2.5 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm"></i>
+                            </div>
+                            <div class="relative sm:col-span-2">
+                                {{ form.ciudad(class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all h-10" + (" border-red-500 dark:border-red-600" if form.ciudad.errors else ""), id="create_ciudad", placeholder="Ciudad/Población") }}
+                                <i class="fas fa-city absolute left-2.5 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm"></i>
+                            </div>
+                        </div>
+
+                        <!-- Teléfono y Email -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <div class="relative">
+                                {{ form.telefono(class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all h-10" + (" border-red-500 dark:border-red-600" if form.telefono.errors else ""), id="create_telefono", placeholder="Teléfono") }}
+                                <i class="fas fa-phone absolute left-2.5 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm"></i>
+                            </div>
+                            <div class="relative">
+                                {{ form.email(class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all h-10" + (" border-red-500 dark:border-red-600" if form.email.errors else ""), id="create_email", placeholder="Email") }}
+                                <i class="fas fa-envelope absolute left-2.5 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm"></i>
+                            </div>
+                        </div>
+
+                        <!-- IBAN -->
+                        <div class="relative">
+                            {{ form.cuenta_bancaria(class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all h-10" + (" border-red-500 dark:border-red-600" if form.cuenta_bancaria.errors else ""), placeholder="ES XX XXXX XXXX XXXX XXXX XXXX", id="create_cuenta_bancaria") }}
+                            <i class="fas fa-university absolute left-2.5 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm"></i>
+                        </div>
+                        {% if form.cuenta_bancaria.errors %}<p class="text-red-500 text-xs mt-1">{{ form.cuenta_bancaria.errors[0] }}</p>{% endif %}
+                        
+                        <!-- Pie de Factura -->
+                        <div class="relative">
+                            {{ form.pie_factura(rows="2", class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all pt-3" + (" border-red-500 dark:border-red-600" if form.pie_factura.errors else ""), placeholder="Ej: Inscrita en el R.M. de Madrid, Tomo 123, Folio 456...", id="create_pie_factura") }}
+                            <i class="fas fa-file-text absolute left-2.5 top-3 text-gray-400 text-sm"></i>
+                        </div>
+                        {% if form.pie_factura.errors %}<p class="text-red-500 text-xs mt-1">{{ form.pie_factura.errors[0] }}</p>{% endif %}
+
+                        <!-- Ruta Base de Documentos -->
+                        <div class="flex space-x-2">
+                            <div class="relative flex-1">
+                                {{ form.documentos_ruta_base(class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all h-10" + (" border-red-500 dark:border-red-600" if form.documentos_ruta_base.errors else ""), placeholder="Ej: D:\\Mis Documentos\\Alquileres\\PropietarioX", id="create_documentos_ruta_base") }}
+                                <i class="fas fa-folder absolute left-2.5 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm"></i>
+                            </div>
+<!--                             <button type="button" onclick="selectFolderPath('create_documentos_ruta_base')" class="px-3 py-2 bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 text-white text-sm rounded-lg flex items-center space-x-1 transition-all shadow hover:shadow-lg">
+                                <i class="fas fa-folder-open text-sm"></i>
+                                <span class="hidden sm:inline">Examinar</span>
+                            </button> -->
+                        </div>
+                        {% if form.documentos_ruta_base.errors %}<p class="text-red-500 text-xs mt-1">{{ form.documentos_ruta_base.errors[0] }}</p>{% endif %}
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ form.documentos_ruta_base.description }}</p>
+                    </div>
+                </div>
+
+                <!-- Footer del Modal -->
+                <div class="bg-gray-50 dark:bg-gray-900/50 px-6 py-4 flex items-center justify-between border-t border-gray-200 dark:border-gray-700">
+                    <div class="text-xs text-gray-500 dark:text-gray-400 flex items-center">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        Los campos marcados con * son obligatorios
+                    </div>
+                    <div class="flex space-x-2">
+                        <button type="button" onclick="closeModal('createOwnerModal')"
+                                class="px-4 py-2 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 font-medium text-sm transition-colors flex items-center">
+                            <i class="fas fa-times mr-2"></i>
+                            Cancelar
+                        </button>
+                        {{ form.submit(class="px-4 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800 font-medium text-sm transition-all flex items-center shadow hover:shadow-lg", id="create_submit") }}
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Editar Propietario -->
+<div id="editOwnerModal" class="fixed inset-0 overflow-y-auto hidden z-50" role="dialog" aria-labelledby="edit-owner-modal-title" aria-modal="true">
+    <div class="flex items-end justify-center min-h-screen px-4 pb-20 text-center sm:block sm:p-0">
+        <div class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm transition-opacity" aria-hidden="true"></div>
+        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">​</span>
+        <div class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-xl overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl w-full modal-content">
+            {# Usar form_edit_with_errors si se pasó, sino el 'form' (create_form) solo para el token CSRF #}
+            {% set form_instance_for_edit_csrf = form_edit_with_errors or form %}
+            <form id="editOwnerForm" action="" method="POST" novalidate>
+                 {{ form_instance_for_edit_csrf.csrf_token }}
+                 <input type="hidden" id="editingOwnerOriginalNif" value=""> {# Para NIF original al editar #}
+
+                 <div class="bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-4">
+                    <div class="flex items-center justify-between">
+                        <h3 id="edit-owner-modal-title" class="text-xl font-semibold text-white flex items-center">
+                            <i class="fas fa-user-edit mr-3"></i>Editar Propietario
+                        </h3>
+                        <button type="button" onclick="closeModal('editOwnerModal')" 
+                                class="text-white/80 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-white/50 rounded-lg p-1">
+                            <i class="fas fa-times text-xl"></i>
+                        </button>
+                    </div>
+                </div>
+
+                 <div class="px-6 py-4 max-h-[calc(100vh-200px)] overflow-y-auto modal-body">
+                    <div class="space-y-3">
+                        {# Campo NIF con botón de búsqueda externa #}
+                        <div>
+                            <label for="edit_nif" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">NIF/CIF <span class="text-red-500">*</span></label>
+                            <div class="flex items-stretch">
+                                <div class="relative flex-1">
+                                    <input type="text" id="edit_nif" name="edit_nif" required 
+                                           class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-l-lg bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" 
+                                           readonly placeholder="NIF/CIF *">
+                                    <i class="fas fa-id-card absolute left-2.5 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm"></i>
+                                </div>
+                                <button type="button" onclick="fetchExternalOwnerDataForEdit()" 
+                                        class="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-4 py-2 rounded-r-lg text-sm flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all shadow hover:shadow-lg"
+                                        title="Actualizar datos desde BD GENERAL (CLIENTES)">
+                                    <i class="fas fa-sync-alt mr-1"></i>
+                                    <span class="hidden sm:inline">Actualizar</span>
+                                </button>
+                            </div>
+                            <div id="externalEditOwnerLookupStatus" class="text-xs mt-1 min-h-[1.2em] transition-all duration-300"></div>
+                            {% if form_edit_with_errors and form_edit_with_errors.nif.errors %}<p class="text-red-500 text-xs mt-1">{{ form_edit_with_errors.nif.errors[0] }}</p>{% endif %}
+                        </div>
+
+                        {# Nombre #}
+                        <div class="relative">
+                            <input type="text" id="edit_nombre" name="edit_nombre" required placeholder="Nombre Completo *" class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+                            <i class="fas fa-user absolute left-2.5 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm"></i>
+                             {% if form_edit_with_errors and form_edit_with_errors.nombre.errors %}<p class="text-red-500 text-xs mt-1">{{ form_edit_with_errors.nombre.errors[0] }}</p>{% endif %}
+                        </div>
+
+                        {# Dirección #}
+                        <div class="relative">
+                            <input type="text" id="edit_direccion" name="edit_direccion" placeholder="Dirección completa" class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+                            <i class="fas fa-map-marker-alt absolute left-2.5 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm"></i>
+                        </div>
+
+                        {# Código Postal y Ciudad #}
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                            <div class="relative">
+                                <input type="text" id="edit_codigo_postal" name="edit_codigo_postal" placeholder="C.P." class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+                                <i class="fas fa-mail-bulk absolute left-2.5 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm"></i>
+                            </div>
+                            <div class="relative sm:col-span-2">
+                                <input type="text" id="edit_ciudad" name="edit_ciudad" placeholder="Ciudad/Población" class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+                                <i class="fas fa-city absolute left-2.5 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm"></i>
+                            </div>
+                        </div>
+
+                        {# Teléfono y Email #}
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <div class="relative">
+                                <input type="tel" id="edit_telefono" name="edit_telefono" placeholder="Teléfono" class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+                                <i class="fas fa-phone absolute left-2.5 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm"></i>
+                            </div>
+                            <div class="relative">
+                                <input type="email" id="edit_email" name="edit_email" placeholder="Email" class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+                                <i class="fas fa-envelope absolute left-2.5 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm"></i>
+                                {% if form_edit_with_errors and form_edit_with_errors.email.errors %}<p class="text-red-500 text-xs mt-1">{{ form_edit_with_errors.email.errors[0] }}</p>{% endif %}
+                            </div>
+                        </div>
+
+                        {# IBAN #}
+                        <div class="relative">
+                            <input type="text" id="edit_cuenta_bancaria" name="edit_cuenta_bancaria" placeholder="IBAN (ES XX XXXX XXXX...)" pattern="[A-Z]{2}[0-9]{2}(?:[ ]?[0-9A-Z]){11,30}" title="IBAN válido" class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+                            <i class="fas fa-university absolute left-2.5 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm"></i>
+                            {% if form_edit_with_errors and form_edit_with_errors.cuenta_bancaria.errors %}<p class="text-red-500 text-xs mt-1">{{ form_edit_with_errors.cuenta_bancaria.errors[0] }}</p>{% endif %}
+                        </div>
+
+                        {# Pie de Factura #}
+                        <div class="relative">
+                            <textarea id="edit_pie_factura" name="edit_pie_factura" rows="2" placeholder="Notas para el pie de factura" class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all pt-3"></textarea>
+                            <i class="fas fa-file-text absolute left-2.5 top-3 text-gray-400 text-sm"></i>
+                        </div>
+
+                        {# Ruta Base de Documentos #}
+                        <div class="relative">
+                            <input type="text" id="edit_documentos_ruta_base" name="edit_documentos_ruta_base" placeholder="Ruta base para documentos (Opcional)" class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+                             <i class="fas fa-folder absolute left-2.5 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm"></i>
+                             {% if form_edit_with_errors and form_edit_with_errors.documentos_ruta_base.errors %}<p class="text-red-500 text-xs mt-1">{{ form_edit_with_errors.documentos_ruta_base.errors[0] }}</p>{% endif %}
+                        </div>
+                    </div>
+                 </div>
+
+                 <!-- Footer del Modal -->
+                 <div class="bg-gray-50 dark:bg-gray-900/50 px-6 py-4 flex items-center justify-between border-t border-gray-200 dark:border-gray-700">
+                    <div class="text-xs text-gray-500 dark:text-gray-400 flex items-center">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        Los campos marcados con * son obligatorios
+                    </div>
+                    <div class="flex space-x-2">
+                        <button type="button" onclick="closeModal('editOwnerModal')"
+                                class="px-4 py-2 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 font-medium text-sm transition-colors flex items-center">
+                            <i class="fas fa-times mr-2"></i>
+                            Cancelar
+                        </button>
+                        <button type="submit" id="edit_submit_button"
+                                class="px-4 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700 font-medium text-sm transition-all flex items-center shadow hover:shadow-lg">
+                            <i class="fas fa-save mr-2"></i>
+                            Guardar Cambios
+                        </button>
+                    </div>
+                 </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL PROFESIONAL: Confirmar Importación de Activos desde BD Fiscal -->
+<div id="confirmFiscalImportModal" class="fixed inset-0 overflow-y-auto hidden z-50" role="dialog" aria-labelledby="confirm-fiscal-import-title" aria-modal="true">
+    <div class="flex items-end justify-center min-h-screen px-4 pb-20 text-center sm:block sm:p-0">
+        <div class="fixed inset-0 bg-gray-900/75 backdrop-blur-sm transition-opacity" aria-hidden="true"></div>
+        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">​</span>
+        
+        <div class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-2xl overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl w-full modal-content">
+            <!-- Header Profesional -->
+            <div class="bg-gradient-to-r from-teal-600 via-cyan-600 to-blue-600 px-8 py-6 relative overflow-hidden">
+                <div class="absolute inset-0 bg-black/10"></div>
+                <div class="relative flex items-center justify-between">
+                    <div class="flex items-center space-x-4">
+                        <div class="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
+                            <i class="fas fa-cloud-download-alt text-white text-2xl"></i>
+                        </div>
+                        <div>
+                            <h3 id="confirm-fiscal-import-title" class="text-2xl font-bold text-white">
+                                Importación desde BD Fiscal
+                            </h3>
+                            <p class="text-teal-100 text-sm mt-1">Confirma los datos antes de proceder</p>
+                        </div>
+                    </div>
+                    <button type="button" onclick="closeModal('confirmFiscalImportModal')" 
+                            class="text-white/80 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-white/50 rounded-full p-2 hover:bg-white/10">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Body con diseño profesional -->
+            <div class="px-8 py-6 max-h-[calc(100vh-300px)] overflow-y-auto">
+                <!-- Info del propietario -->
+                <div class="bg-gradient-to-r from-blue-50 to-teal-50 dark:from-gray-800 dark:to-gray-700 rounded-xl p-6 mb-6 border border-blue-200 dark:border-gray-600">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-12 h-12 bg-blue-100 dark:bg-blue-900/50 rounded-full flex items-center justify-center">
+                            <i class="fas fa-user-tie text-blue-600 dark:text-blue-400 text-lg"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-600 dark:text-gray-400">Importando datos para:</p>
+                            <p class="text-xl font-bold text-gray-900 dark:text-white" id="fiscalImportOwnerName"></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Mensaje informativo -->
+                <div class="bg-amber-50 dark:bg-amber-900/20 border-l-4 border-amber-400 p-4 mb-6 rounded-r-lg">
+                    <div class="flex">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-info-circle text-amber-400"></i>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-sm text-amber-700 dark:text-amber-300">
+                                Solo se crearán los elementos nuevos.
+                                La verificación se basa en Referencia Catastral (propiedades) y NIF (inquilinos).
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Errores y advertencias -->
+                <div id="fiscalImportErrors" class="mb-6 hidden">
+                    <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4">
+                        <h4 class="flex items-center text-lg font-semibold text-red-800 dark:text-red-300 mb-3">
+                            <i class="fas fa-exclamation-triangle mr-2"></i>
+                            Advertencias detectadas
+                        </h4>
+                        <ul class="list-disc list-inside text-sm text-red-700 dark:text-red-300 space-y-1" id="fiscalImportErrorList"></ul>
+                    </div>
+                </div>
+                
+                <!-- Grid de resultados -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Propiedades -->
+                    <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+                        <div class="bg-green-50 dark:bg-green-900/20 px-6 py-4 border-b border-green-200 dark:border-green-800">
+                            <h4 class="flex items-center text-lg font-semibold text-green-800 dark:text-green-300">
+                                <i class="fas fa-home mr-3 text-green-600 dark:text-green-400"></i>
+                                Propiedades desde BD Fiscal
+                            </h4>
+                        </div>
+                        <div id="fiscalImportPropertiesList" class="max-h-60 overflow-y-auto">
+                            <div class="p-6 text-center">
+                                <div class="inline-flex items-center justify-center w-12 h-12 bg-gray-100 dark:bg-gray-700 rounded-full mb-3">
+                                    <i class="fas fa-spinner fa-spin text-gray-400"></i>
+                                </div>
+                                <p class="text-gray-500 dark:text-gray-400">Buscando propiedades...</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Inquilinos -->
+                    <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+                        <div class="bg-blue-50 dark:bg-blue-900/20 px-6 py-4 border-b border-blue-200 dark:border-blue-800">
+                            <h4 class="flex items-center text-lg font-semibold text-blue-800 dark:text-blue-300">
+                                <i class="fas fa-users mr-3 text-blue-600 dark:text-blue-400"></i>
+                                Inquilinos desde BD Fiscal
+                            </h4>
+                        </div>
+                        <div id="fiscalImportInquilinosList" class="max-h-60 overflow-y-auto">
+                            <div class="p-6 text-center">
+                                <div class="inline-flex items-center justify-center w-12 h-12 bg-gray-100 dark:bg-gray-700 rounded-full mb-3">
+                                    <i class="fas fa-spinner fa-spin text-gray-400"></i>
+                                </div>
+                                <p class="text-gray-500 dark:text-gray-400">Buscando inquilinos...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Estado de la operación -->
+                <div id="fiscalImportStatus" class="mt-6 text-center min-h-[2rem] flex items-center justify-center"></div>
+            </div>
+
+            <!-- Footer profesional -->
+            <div class="bg-gray-50 dark:bg-gray-900/50 px-8 py-6 flex items-center justify-between border-t border-gray-200 dark:border-gray-700">
+                <div class="flex items-center text-sm text-gray-500 dark:text-gray-400">
+                    <i class="fas fa-shield-alt mr-2 text-green-500"></i>
+                    Operación segura - Se pueden deshacer los cambios
+                </div>
+                <div class="flex space-x-3">
+                    <button type="button" onclick="closeModal('confirmFiscalImportModal')"
+                            class="px-6 py-3 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 font-medium text-sm transition-all flex items-center shadow-sm">
+                        <i class="fas fa-times mr-2"></i>
+                        Cancelar
+                    </button>
+                    <button type="button" id="executeFiscalImportButton" onclick="executeActualFiscalImport()"
+                            class="px-6 py-3 rounded-lg bg-gradient-to-r from-teal-600 to-cyan-600 text-white hover:from-teal-700 hover:to-cyan-700 font-semibold text-sm transition-all flex items-center shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed">
+                        <i class="fas fa-check-circle mr-2"></i>
+                        Confirmar Importación
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Confirmar Eliminación -->
+<div id="deleteOwnerModal" class="fixed inset-0 overflow-y-auto hidden z-50">
+    <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm transition-opacity" aria-hidden="true"></div>
+        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">​</span>
+        
+        <div class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            <div class="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div class="sm:flex sm:items-start">
+                    <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 dark:bg-red-900/30 sm:mx-0 sm:h-10 sm:w-10">
+                        <i class="fas fa-exclamation-triangle text-red-600 dark:text-red-400"></i>
+                    </div>
+                    <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white">Eliminar propietario</h3>
+                        <div class="mt-2">
+                            <p class="text-sm text-gray-500 dark:text-gray-400">
+                                ¿Estás seguro de que deseas eliminar este propietario? Se eliminarán también todas las propiedades, contratos y datos asociados. Esta acción no se puede deshacer.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button type="button" class="confirm-delete-button w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm">
+                    <i class="fas fa-trash mr-2"></i>
+                    Eliminar
+                </button>
+                <button type="button" onclick="closeModal('deleteOwnerModal')" 
+                        class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-800 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                    Cancelar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- <input type="file" id="folderSelector" webkitdirectory directory multiple style="display: none;" onchange="handleFolderSelection(event)"> -->
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Las funciones showModal y closeModal ya están en base.html
+    // La función confirmDeleteWithToken también está en base.html
+
+	let currentPathInput = null;
+    // Variable global para almacenar los datos recuperados para la importación final
+    let dataForFinalImport = null; 
+
+    function showCreateOwnerModal() {
+        try {
+            const form = document.getElementById('createOwnerForm');
+            if (form) {
+                form.reset();
+                // Limpiar errores de validación del backend si se mostraron
+                form.querySelectorAll('.text-red-500.text-xs.mt-1').forEach(el => el.textContent = '');
+                form.querySelectorAll('.border-red-500').forEach(el => el.classList.remove('border-red-500', 'dark:border-red-600'));
+                
+                // Limpiar estado de búsqueda externa
+                const statusDiv = document.getElementById('externalLookupStatus');
+                if(statusDiv) statusDiv.innerHTML = '';
+            }
+        } catch (e) { console.error("Error reseteando form crear:", e); }
+        showModal('createOwnerModal'); // Asume que showModal está definida globalmente
+    }
+
+    function editOwner(buttonElement) {
+        // ... (código existente para rellenar los campos del modal)
+        const ownerData = buttonElement.closest('tr.owner-row').dataset;
+        document.getElementById('edit_nif').value = ownerData.nif || '';
+        document.getElementById('editingOwnerOriginalNif').value = ownerData.nif || ''; // Guardar NIF original
+        document.getElementById('edit_nif').readOnly = true; // Hacerlo readonly
+        
+        // Rellenar el resto de los campos...
+        document.getElementById('edit_nombre').value = ownerData.nombre || '';
+        document.getElementById('edit_direccion').value = ownerData.direccion || '';
+        document.getElementById('edit_codigo_postal').value = ownerData.cp || '';
+        document.getElementById('edit_ciudad').value = ownerData.poblacion || '';
+        document.getElementById('edit_telefono').value = ownerData.telefono || '';
+        document.getElementById('edit_email').value = ownerData.email || '';
+        document.getElementById('edit_cuenta_bancaria').value = ownerData.iban || '';
+        document.getElementById('edit_pie_factura').value = ownerData.pie_factura || '';
+        // document.getElementById('edit_documentos_ruta_base').value = ownerData.documentosRutaBase || '';
+		document.getElementById('edit_documentos_ruta_base').value = ownerData.documentos_ruta_base || '';
+
+        const editForm = document.getElementById('editOwnerForm');
+        editForm.action = `{{ url_for('propietarios_bp.edit_propietario', id=0) }}`.replace('0', ownerData.id);
+        
+        const statusDiv = document.getElementById('externalEditOwnerLookupStatus'); // Limpiar estado de búsqueda
+        if(statusDiv) statusDiv.innerHTML = '';
+
+        showModal('editOwnerModal');
+    }
+
+    // --- NUEVA FUNCIÓN PARA ACTUALIZAR DATOS DEL PROPIETARIO EN EDICIÓN ---
+    async function fetchExternalOwnerDataForEdit() {
+        const nifOriginalParaBusqueda = document.getElementById('editingOwnerOriginalNif').value;
+        const statusDiv = document.getElementById('externalEditOwnerLookupStatus');
+        
+        // IDs de los campos del formulario de edición
+        const nombreInput = document.getElementById('edit_nombre');
+        const direccionInput = document.getElementById('edit_direccion');
+        const cpInput = document.getElementById('edit_codigo_postal');
+        const ciudadInput = document.getElementById('edit_ciudad');
+        const telefonoInput = document.getElementById('edit_telefono');
+        const emailInput = document.getElementById('edit_email'); // Para mantenerlo si no viene de Firebird
+        const ibanInput = document.getElementById('edit_cuenta_bancaria');
+        const pieFacturaInput = document.getElementById('edit_pie_factura');
+        // El campo documentos_ruta_base no se espera de esta API
+
+        if (!nifOriginalParaBusqueda) {
+            if (statusDiv) statusDiv.innerHTML = '<span class="text-red-600 dark:text-red-400">Error: NIF original no disponible para la búsqueda.</span>';
+            return;
+        }
+
+        if (statusDiv) statusDiv.innerHTML = '<span class="text-blue-600 dark:text-blue-400"><i class="fas fa-spinner fa-spin mr-1"></i>Actualizando datos desde BD GENERAL...</span>';
+
+        try {
+            // Usamos la API existente para propietarios
+            const response = await fetch(`{{ url_for('external_db_api_bp.lookup_propietario_from_general_db', nif_to_lookup='__NIF__') }}`.replace('__NIF__', encodeURIComponent(nifOriginalParaBusqueda)));
+            const result = await response.json();
+
+            if (statusDiv) statusDiv.innerHTML = ''; 
+
+            if (response.ok) {
+                if (result.data) { // Si la API devolvió datos de CLIENTES para el NIF
+                    statusDiv.innerHTML = '<span class="text-green-600 dark:text-green-400"><i class="fas fa-check-circle mr-1"></i>Datos de BD GENERAL aplicados al formulario. Revisa y guarda los cambios.</span>';
+                    
+                    // Actualizar campos del formulario con los datos de CLIENTES,
+                    // manteniendo el valor actual si el dato de CLIENTES es nulo/vacío.
+                    // El NIF no se toca aquí porque es la clave de búsqueda.
+                    if (nombreInput) nombreInput.value = result.data.nombre || nombreInput.value;
+                    if (direccionInput) direccionInput.value = result.data.direccion || direccionInput.value;
+                    if (cpInput) cpInput.value = result.data.codigo_postal || cpInput.value;
+                    if (ciudadInput) ciudadInput.value = result.data.ciudad || ciudadInput.value;
+                    if (telefonoInput) telefonoInput.value = result.data.telefono || telefonoInput.value;
+                    if (emailInput && result.data.email !== undefined) { // Solo actualizar email si viene (aunque sea null)
+                        emailInput.value = result.data.email || ''; // Si es null de FB, poner vacío
+                    }
+                    if (ibanInput) ibanInput.value = result.data.cuenta_bancaria || ibanInput.value; // IBAN ya formateado
+                    if (pieFacturaInput) pieFacturaInput.value = result.data.pie_factura || pieFacturaInput.value;
+                    
+                    // Disparar evento input para validaciones o UI
+                    [nombreInput, direccionInput, cpInput, ciudadInput, telefonoInput, emailInput, ibanInput, pieFacturaInput].forEach(el => {
+                        if(el) el.dispatchEvent(new Event('input', { bubbles: true }));
+                    });
+
+                } else { 
+                    statusDiv.innerHTML = `<span class="text-gray-600 dark:text-gray-400">${result.message || `No se encontraron datos en BD GENERAL para el NIF ${nifOriginalParaBusqueda}. No se actualizaron campos.`}</span>`;
+                }
+            } else { 
+                statusDiv.innerHTML = `<span class="text-red-600 dark:text-red-400">${result.error || 'Error al buscar datos externos.'}</span>`;
+            }
+        } catch (error) {
+            console.error('Error en fetchExternalOwnerDataForEdit:', error);
+            if (statusDiv) statusDiv.innerHTML = '<span class="text-red-600 dark:text-red-400">Error de conexión al buscar datos.</span>';
+        } finally {
+            setTimeout(() => {
+                if (statusDiv && !(statusDiv.querySelector('.text-red-600'))) { // Limpiar si no es un error rojo
+                     statusDiv.innerHTML = '';
+                }
+            }, 7000);
+        }
+    }
+
+    function deleteOwner(id) {
+        try {
+            const modal = document.getElementById('deleteOwnerModal');
+            if (!modal) { console.error("Modal 'deleteOwnerModal' no encontrado"); return; }
+            const confirmBtn = modal.querySelector('.confirm-delete-button');
+            if (!confirmBtn) { console.error("Botón de confirmación no encontrado"); return; }
+
+            // Obtener el token CSRF de forma segura
+            const csrfTokenValue = document.querySelector('#createOwnerForm input[name="csrf_token"]')?.value || // Del form de creación
+                                   document.querySelector('#editOwnerForm input[name="csrf_token"]')?.value ||  // Del form de edición (si renderiza con WTForms)
+                                   document.querySelector('meta[name="csrf-token"]')?.content || '';         // Del meta tag
+            
+            if (!csrfTokenValue) {
+                console.error("Token CSRF no encontrado para deleteOwner.");
+                alert("Error de seguridad. No se puede eliminar.");
+                return;
+            }
+
+            confirmBtn.onclick = function() {
+                if (typeof confirmDeleteWithToken === 'function') {
+                    confirmDeleteWithToken(
+                        'deleteOwnerModal',
+                        `{{ url_for('propietarios_bp.delete_propietario', id=0) }}`.replace('0', id),
+                        csrfTokenValue
+                    );
+                } else {
+                    console.error("Función global confirmDeleteWithToken no definida. Asegúrate que está en base.html");
+                    // Fallback (menos ideal, pero funcional)
+                    closeModal('deleteOwnerModal');
+                    const form = document.createElement('form');
+                    form.method = 'POST';
+                    form.action = `{{ url_for('propietarios_bp.delete_propietario', id=0) }}`.replace('0', id);
+                    const csrfInput = document.createElement('input');
+                    csrfInput.type = 'hidden';
+                    csrfInput.name = 'csrf_token';
+                    csrfInput.value = csrfTokenValue;
+                    form.appendChild(csrfInput);
+                    document.body.appendChild(form);
+                    form.submit();
+                }
+            };
+            showModal('deleteOwnerModal'); // Asume que showModal está definida globalmente
+        } catch (e) {
+            console.error("Error en deleteOwner:", e);
+            alert("Ocurrió un error al intentar eliminar el propietario.");
+        }
+    }
+	
+	function selectFolderPath(inputId) {
+		try {
+			currentPathInput = inputId;
+			const folderSelector = document.getElementById('folderSelector');
+			
+			// Verificar si el navegador soporta selección de carpetas
+			if (!folderSelector.webkitdirectory && !('showDirectoryPicker' in window)) {
+				alert('Su navegador no soporta la selección de carpetas. Por favor, escriba la ruta manualmente.');
+				return;
+			}
+			
+			// Intentar usar la API moderna primero (Chrome 86+)
+			if ('showDirectoryPicker' in window) {
+				selectFolderModern(inputId);
+			} else {
+				// Fallback al método tradicional
+				folderSelector.click();
+			}
+		} catch (error) {
+			console.error('Error al abrir selector de carpetas:', error);
+			alert('Error al abrir el selector de carpetas. Escriba la ruta manualmente.');
+		}
+	}	
+
+	async function selectFolderModern(inputId) {
+		try {
+			// Usar la API moderna File System Access
+			const directoryHandle = await window.showDirectoryPicker();
+			
+			// Construir la ruta a partir del nombre de la carpeta
+			let folderPath = directoryHandle.name;
+			
+			// Intentar obtener la ruta completa (limitado por seguridad del navegador)
+			if (directoryHandle.resolve) {
+				try {
+					const pathSegments = await directoryHandle.resolve();
+					if (pathSegments && pathSegments.length > 0) {
+						folderPath = pathSegments.join('\\'); // Windows style
+					}
+				} catch (e) {
+					console.log('No se pudo obtener la ruta completa, usando nombre de carpeta');
+				}
+			}
+			
+			// Establecer la ruta en el input
+			const input = document.getElementById(inputId);
+			if (input) {
+				input.value = folderPath;
+				showPathNotification(folderPath, true);
+			}
+		} catch (error) {
+			if (error.name !== 'AbortError') {
+				console.error('Error al seleccionar carpeta:', error);
+				alert('Error al seleccionar la carpeta.');
+			}
+		}
+	}
+
+	function handleFolderSelection(event) {
+		try {
+			const files = event.target.files;
+			if (files.length === 0 || !currentPathInput) return;
+			
+			// Obtener la ruta de la primera archivo (que representa la carpeta)
+			const firstFile = files[0];
+			let folderPath = '';
+			
+			if (firstFile.webkitRelativePath) {
+				// Extraer la carpeta padre de la ruta relativa
+				const pathParts = firstFile.webkitRelativePath.split('/');
+				folderPath = pathParts[0]; // Primer directorio es la carpeta seleccionada
+			} else if (firstFile.path) {
+				// En algunos casos podemos obtener la ruta completa
+				const pathParts = firstFile.path.split(/[/\\]/);
+				pathParts.pop(); // Quitar el nombre del archivo
+				folderPath = pathParts.join('\\');
+			}
+			
+			// Establecer la ruta en el input correspondiente
+			const input = document.getElementById(currentPathInput);
+			if (input && folderPath) {
+				input.value = folderPath;
+				showPathNotification(folderPath, false);
+			} else {
+				alert('No se pudo determinar la ruta de la carpeta. Por favor, escríbala manualmente.');
+			}
+			
+			// Limpiar el selector
+			event.target.value = '';
+			currentPathInput = null;
+		} catch (error) {
+			console.error('Error al procesar selección de carpeta:', error);
+			alert('Error al procesar la selección de carpeta.');
+		}
+	}
+
+	function showPathNotification(path, isModernAPI) {
+		// Crear notificación temporal
+		const notification = document.createElement('div');
+		notification.className = 'fixed top-4 right-4 bg-green-100 dark:bg-green-900/50 border border-green-400 text-green-700 dark:text-green-300 px-4 py-3 rounded-lg shadow-lg z-50 max-w-md';
+		notification.innerHTML = `
+			<div class="flex items-start">
+				<i class="fas fa-check-circle mr-2 mt-0.5"></i>
+				<div>
+					<p class="font-medium">Carpeta seleccionada</p>
+					<p class="text-sm">${path}</p>
+					${!isModernAPI ? '<p class="text-xs mt-1 opacity-75">Nota: Solo se muestra el nombre de la carpeta por limitaciones de seguridad del navegador</p>' : ''}
+				</div>
+			</div>
+		`;
+		
+		document.body.appendChild(notification);
+		
+		// Eliminar la notificación después de 5 segundos
+		setTimeout(() => {
+			if (notification.parentNode) {
+				notification.parentNode.removeChild(notification);
+			}
+		}, 5000);
+	}
+
+    // === SISTEMA DE BÚSQUEDA MEJORADO ===
+    function searchOwners() {
+        try {
+            const searchTerm = document.getElementById('ownerSearch').value.toLowerCase().trim();
+            const searchFilter = document.getElementById('searchFilter').value;
+            const rows = document.querySelectorAll('#ownersTable tr.owner-row');
+            const totalCount = rows.length;
+            let visibleCount = 0;
+
+            rows.forEach(row => {
+                let shouldShow = false;
+                
+                if (!searchTerm) {
+                    shouldShow = true;
+                } else {
+                    if (searchFilter === 'all') {
+                        // Buscar en todos los campos
+                        const searchableText = [
+                            row.querySelector('.owner-nombre')?.textContent || '',
+                            row.querySelector('.owner-nif')?.textContent || '', 
+                            row.querySelector('.owner-telefono')?.textContent || '',
+                            row.querySelector('.owner-email')?.textContent || ''
+                        ].join(' ').toLowerCase();
+                        shouldShow = searchableText.includes(searchTerm);
+                    } else {
+                        // Buscar en campo específico
+                        const fieldElement = row.querySelector(`.owner-${searchFilter}`);
+                        if (fieldElement) {
+                            shouldShow = fieldElement.textContent.toLowerCase().includes(searchTerm);
+                        }
+                    }
+                }
+                
+                row.style.display = shouldShow ? '' : 'none';
+                if (shouldShow) visibleCount++;
+            });
+
+            // Actualizar contador de resultados
+            updateSearchResults(visibleCount, totalCount, searchTerm);
+            
+        } catch (e) { 
+            console.error("Error en searchOwners:", e); 
+        }
+    }
+
+    function updateSearchResults(visible, total, searchTerm) {
+        const resultsDiv = document.getElementById('searchResults');
+        const visibleSpan = document.getElementById('visibleCount');
+        const totalSpan = document.getElementById('totalCount');
+        
+        if (resultsDiv && visibleSpan && totalSpan) {
+            visibleSpan.textContent = visible;
+            totalSpan.textContent = total;
+            
+            if (searchTerm && searchTerm.length > 0) {
+                resultsDiv.classList.remove('hidden');
+                if (visible === 0) {
+                    resultsDiv.className = resultsDiv.className.replace('text-gray-600 dark:text-gray-400', 'text-orange-600 dark:text-orange-400');
+                    resultsDiv.innerHTML = `<i class="fas fa-search mr-1"></i>No se encontraron propietarios que coincidan con "${searchTerm}"`;
+                } else {
+                    resultsDiv.className = resultsDiv.className.replace('text-orange-600 dark:text-orange-400', 'text-gray-600 dark:text-gray-400');
+                    resultsDiv.innerHTML = `<i class="fas fa-info-circle mr-1"></i>Mostrando <span id="visibleCount">${visible}</span> de <span id="totalCount">${total}</span> propietarios`;
+                }
+            } else {
+                resultsDiv.classList.add('hidden');
+            }
+        }
+    }
+
+    function clearSearch() {
+        document.getElementById('ownerSearch').value = '';
+        document.getElementById('searchFilter').value = 'all';
+        searchOwners();
+        document.getElementById('ownerSearch').focus();
+    }
+
+    // Mejorar la búsqueda en tiempo real con debounce
+    let searchTimeout;
+    document.addEventListener('DOMContentLoaded', function() {
+        const searchInput = document.getElementById('ownerSearch');
+        if (searchInput) {
+            searchInput.addEventListener('input', function() {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(searchOwners, 300); // 300ms de delay
+            });
+        }
+    });
+
+    // --- NUEVA FUNCIÓN PARA BUSCAR EN FIREBIRD "GENERAL" Y AUTOCOMPLETAR ---
+    async function fetchExternalOwnerDataFromGeneralDB() {
+        const nifInput = document.getElementById('create_nif'); // ID del input del NIF en el modal de creación
+        const statusDiv = document.getElementById('externalLookupStatus');
+        const submitButton = document.getElementById('create_submit');
+
+        if (!nifInput || !nifInput.value.trim()) {
+            if (statusDiv) {
+                statusDiv.innerHTML = '<span class="text-yellow-600 dark:text-yellow-400 flex items-center"><i class="fas fa-exclamation-triangle mr-1"></i>Introduce un NIF para buscar.</span>';
+                setTimeout(() => { if(statusDiv) statusDiv.innerHTML = ''; }, 3000);
+            }
+            nifInput.focus();
+            return;
+        }
+
+        const nif = nifInput.value.trim();
+        if (statusDiv) statusDiv.innerHTML = '<span class="text-blue-600 dark:text-blue-400 flex items-center"><i class="fas fa-spinner fa-spin mr-1"></i>Buscando en BD GENERAL...</span>';
+        if (submitButton) submitButton.disabled = true;
+
+        try {
+            const response = await fetch(`{{ url_for('external_db_api_bp.lookup_propietario_from_general_db', nif_to_lookup='__NIF__') }}`.replace('__NIF__', encodeURIComponent(nif)));
+            const result = await response.json();
+
+            if (statusDiv) statusDiv.innerHTML = ''; // Limpiar mensaje de "buscando"
+
+            if (response.ok) {
+                if (result.exists_in_app) {
+                    statusDiv.innerHTML = `<span class="text-yellow-600 dark:text-yellow-400 flex items-center"><i class="fas fa-exclamation-triangle mr-1"></i>${result.message}</span>`;
+                } else if (result.data) {
+                    statusDiv.innerHTML = '<span class="text-green-600 dark:text-green-400 flex items-center"><i class="fas fa-check-circle mr-1"></i>Datos encontrados y rellenados. Por favor, revisa y completa la información antes de guardar.</span>';
+                    
+                    // Mapeo de claves de result.data a IDs de input del formulario
+                    const fieldMapping = {
+                        'nombre': 'create_nombre',
+                        'nif': 'create_nif', // Aunque ya lo tenemos, por si Firebird lo devuelve formateado diferente
+                        'direccion': 'create_direccion',
+                        'codigo_postal': 'create_codigo_postal',
+                        'ciudad': 'create_ciudad',
+                        'telefono': 'create_telefono',
+                        'email': 'create_email',
+                        'cuenta_bancaria': 'create_cuenta_bancaria',
+                        'pie_factura': 'create_pie_factura',
+                        'documentos_ruta_base': 'create_documentos_ruta_base'
+                    };
+
+                    // Efecto visual: resaltar campos que se van a llenar
+                    const fieldsToHighlight = [];
+                    for (const [dataKey, inputId] of Object.entries(fieldMapping)) {
+                        const inputElement = document.getElementById(inputId);
+                        if (inputElement && result.data[dataKey] !== undefined && result.data[dataKey] !== null && result.data[dataKey] !== '') {
+                            fieldsToHighlight.push(inputElement);
+                        }
+                    }
+
+                    // Animar el llenado de campos
+                    let delay = 0;
+                    for (const [dataKey, inputId] of Object.entries(fieldMapping)) {
+                        const inputElement = document.getElementById(inputId);
+                        if (inputElement && result.data[dataKey] !== undefined && result.data[dataKey] !== null && result.data[dataKey] !== '') {
+                            setTimeout(() => {
+                                // Efecto de resaltado temporal
+                                inputElement.classList.add('ring-2', 'ring-green-400', 'border-green-400');
+                                inputElement.value = result.data[dataKey];
+                                // Disparar evento 'input' para que cualquier lógica JS de la UI reaccione (ej. validadores en vivo)
+                                inputElement.dispatchEvent(new Event('input', { bubbles: true }));
+                                
+                                // Quitar resaltado después de un momento
+                                setTimeout(() => {
+                                    inputElement.classList.remove('ring-2', 'ring-green-400', 'border-green-400');
+                                }, 1000);
+                            }, delay);
+                            delay += 200; // Stagger el llenado de campos
+                        }
+                    }
+                } else { 
+                    statusDiv.innerHTML = `<span class="text-gray-600 dark:text-gray-400 flex items-center"><i class="fas fa-info-circle mr-1"></i>${result.message || 'No se encontraron datos en la BD externa.'}</span>`;
+                }
+            } else { 
+                statusDiv.innerHTML = `<span class="text-red-600 dark:text-red-400 flex items-center"><i class="fas fa-times-circle mr-1"></i>${result.error || 'Error al buscar datos externos.'}</span>`;
+            }
+        } catch (error) {
+            console.error('Error en fetchExternalOwnerDataFromGeneralDB:', error);
+            if (statusDiv) statusDiv.innerHTML = '<span class="text-red-600 dark:text-red-400 flex items-center"><i class="fas fa-exclamation-triangle mr-1"></i>Error de conexión al buscar datos. Revisa la consola.</span>';
+        } finally {
+            if (submitButton) submitButton.disabled = false;
+            setTimeout(() => { // Limpiar mensaje de estado después de un tiempo más largo si es un error
+                if (statusDiv && (statusDiv.querySelector('.text-red-600') || statusDiv.querySelector('.text-yellow-600') || statusDiv.querySelector('.text-gray-600'))) {
+                    // No limpiar si es un mensaje de éxito para que el usuario lo vea
+                } else if (statusDiv) {
+                     statusDiv.innerHTML = '';
+                }
+            }, 10000); // 10 segundos para errores o mensajes informativos
+        }
+    }
+
+    function makeOwnerRowsClickable() {
+        document.querySelectorAll('#ownersTable tr.owner-row').forEach(row => {
+            // Clonar y reemplazar para evitar listeners duplicados si se llama varias veces
+            const newRow = row.cloneNode(true);
+            row.parentNode.replaceChild(newRow, row);
+
+            newRow.style.cursor = 'pointer'; // Indicar que la fila es clickeable
+            newRow.addEventListener('click', function(event) {
+                // Prevenir la acción si se hizo clic en un botón o enlace dentro de la fila
+                if (event.target.closest('button, a')) {
+                    return;
+                }
+                // 'this' aquí es la fila (tr) en la que se hizo clic
+                // Llamamos a la función editOwner, pasándole un elemento DENTRO de la fila
+                // para que `closest('.owner-row')` funcione como se espera en editOwner.
+                // Podríamos pasar `this` directamente si editOwner está adaptado.
+                // O, si editOwner espera el botón, podemos simularlo o pasar `this` y adaptar editOwner.
+                // Para la estructura actual de editOwner(buttonElement):
+                const firstCellWithPotentialButton = this.querySelector('td:last-child button'); // Un botón cualquiera de la fila
+                if (typeof editOwner === "function") {
+                     // editOwner espera el botón para hacer button.closest('tr.owner-row')
+                     // Si no hay botones, la función editOwner necesitaría adaptarse o
+                     // podríamos pasar `this` (la fila) y que editOwner use directamente `this.dataset`
+                     if (firstCellWithPotentialButton) {
+                        editOwner(firstCellWithPotentialButton);
+                     } else {
+                        // Si no hay botones, y editOwner se puede adaptar para tomar la fila:
+                        // editOwner(this); // Necesitarías modificar editOwner para aceptar la fila
+                        console.warn("No se encontró un botón para pasar a editOwner. Considera adaptar editOwner o la lógica aquí.");
+                     }
+                }
+            });
+        });
+    }
+
+
+    // === FUNCIONES PARA IMPORTACIÓN DESDE BD FISCAL - VERSIÓN CORREGIDA ===
+    async function fetchAssetsForOwner(propietarioNif, propietarioNombre) {
+        const modal = document.getElementById('confirmFiscalImportModal');
+        const ownerNameSpan = document.getElementById('fiscalImportOwnerName');
+        const propsListDiv = document.getElementById('fiscalImportPropertiesList');
+        const inquilinosListDiv = document.getElementById('fiscalImportInquilinosList');
+        const errorsDiv = document.getElementById('fiscalImportErrors');
+        const errorListUl = document.getElementById('fiscalImportErrorList');
+        const statusDiv = document.getElementById('fiscalImportStatus');
+        const executeButton = document.getElementById('executeFiscalImportButton');
+
+        if (!modal || !ownerNameSpan || !propsListDiv || !inquilinosListDiv || !errorsDiv || !errorListUl || !statusDiv || !executeButton) {
+            console.error("Faltan elementos del DOM para el modal de importación fiscal.");
+            showToastNotification('Error al preparar el modal de importación', 'error');
+            return;
+        }
+
+        // Configurar estado inicial del modal
+        ownerNameSpan.textContent = propietarioNombre;
+        propsListDiv.innerHTML = `
+            <div class="p-6 text-center">
+                <div class="inline-flex items-center justify-center w-12 h-12 bg-gray-100 dark:bg-gray-700 rounded-full mb-3">
+                    <i class="fas fa-spinner fa-spin text-gray-400"></i>
+                </div>
+                <p class="text-gray-500 dark:text-gray-400">Buscando propiedades...</p>
+            </div>
+        `;
+        inquilinosListDiv.innerHTML = `
+            <div class="p-6 text-center">
+                <div class="inline-flex items-center justify-center w-12 h-12 bg-gray-100 dark:bg-gray-700 rounded-full mb-3">
+                    <i class="fas fa-spinner fa-spin text-gray-400"></i>
+                </div>
+                <p class="text-gray-500 dark:text-gray-400">Buscando inquilinos...</p>
+            </div>
+        `;
+        
+        errorListUl.innerHTML = '';
+        errorsDiv.classList.add('hidden');
+        statusDiv.innerHTML = `
+            <div class="inline-flex items-center text-blue-600 dark:text-blue-400">
+                <i class="fas fa-search mr-2"></i>
+                <span>Consultando Base de Datos Fiscal...</span>
+            </div>
+        `;
+        executeButton.disabled = true;
+        dataForFinalImport = null;
+
+        // Mostrar modal
+        showModal('confirmFiscalImportModal');
+
+        try {
+            const response = await fetch(`{{ url_for('external_db_api_bp.fetch_owner_assets_from_fiscal_db', propietario_nif_app='__NIF__') }}`.replace('__NIF__', encodeURIComponent(propietarioNif)));
+            const result = await response.json();
+            
+            statusDiv.innerHTML = '';
+
+            if (response.ok) {
+                // CORRECCIÓN: Manejo seguro de datos undefined/null
+                const propiedadesFiscalRecibidas = Array.isArray(result.propiedades_fiscal) ? result.propiedades_fiscal : [];
+                const inquilinosPotencialesRecibidos = Array.isArray(result.inquilinos_potenciales) ? result.inquilinos_potenciales : [];
+                const erroresBusquedaRecibidos = Array.isArray(result.errors) ? result.errors : [];
+
+                // Preparar datos para importación final
+                dataForFinalImport = {
+                    propietario_app_id: result.propietario_app_id,
+                    propiedades_a_crear: propiedadesFiscalRecibidas.filter(p => !p.ya_existe_en_app),
+                    inquilinos_a_crear: inquilinosPotencialesRecibidos.filter(i => !i.exists_in_app)
+                };
+
+                // Mostrar errores si los hay
+                if (erroresBusquedaRecibidos.length > 0) {
+                    erroresBusquedaRecibidos.forEach(err => {
+                        const li = document.createElement('li');
+                        li.textContent = err;
+                        errorListUl.appendChild(li);
+                    });
+                    errorsDiv.classList.remove('hidden');
+                }
+
+                // Renderizar propiedades
+				if (propiedadesFiscalRecibidas.length > 0) {
+					const propiedadesOrdenadas = propiedadesFiscalRecibidas.sort((a, b) => {
+						// Primero las nuevas (ya_existe_en_app = false), luego las existentes
+						if (a.ya_existe_en_app && !b.ya_existe_en_app) return 1;
+						if (!a.ya_existe_en_app && b.ya_existe_en_app) return -1;
+						return 0;
+					});
+					
+					propsListDiv.innerHTML = propiedadesOrdenadas.map(p => `
+                        <div class="p-4 border-b border-gray-200 dark:border-gray-600 last:border-b-0 ${p.ya_existe_en_app ? 'bg-gray-50 dark:bg-gray-700/50 opacity-60' : 'hover:bg-gray-50 dark:hover:bg-gray-700/30'}">
+                            <div class="flex items-start justify-between">
+                                <div class="flex-1">
+                                    <p class="font-semibold text-gray-900 dark:text-white text-sm">
+                                        ${p.direccion_fiscal || 'Dirección N/A'}
+                                    </p>
+                                    <div class="mt-2 grid grid-cols-2 gap-2 text-xs text-gray-600 dark:text-gray-400">
+                                        <span><i class="fas fa-map-marker-alt mr-1"></i>Ref.Cat: ${p.referencia_catastral_fiscal || '-'}</span>
+                                        <span><i class="fas fa-door-open mr-1"></i>Local: ${p.numero_local_fiscal || '-'}</span>
+                                        <span class="col-span-2"><i class="fas fa-user mr-1"></i>Inquilino: ${p.nif_inquilino_asociado_fiscal || 'Sin asignar'}</span>
+                                    </div>
+                                </div>
+                                <div class="ml-3">
+                                    ${p.ya_existe_en_app ? 
+                                        '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400 rounded-full"><i class="fas fa-exclamation-triangle mr-1"></i>Ya existe</span>' : 
+                                        '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400 rounded-full"><i class="fas fa-plus mr-1"></i>Nuevo</span>'
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    propsListDiv.innerHTML = `
+                        <div class="p-6 text-center">
+                            <div class="inline-flex items-center justify-center w-12 h-12 bg-gray-100 dark:bg-gray-700 rounded-full mb-3">
+                                <i class="fas fa-home text-gray-400"></i>
+                            </div>
+                            <p class="text-gray-500 dark:text-gray-400">No se encontraron propiedades en BD Fiscal</p>
+                        </div>
+                    `;
+                }
+
+                // Renderizar inquilinos
+				if (inquilinosPotencialesRecibidos.length > 0) {
+					const inquilinosOrdenados = inquilinosPotencialesRecibidos.sort((a, b) => {
+						// Primero los nuevos (exists_in_app = false), luego los existentes
+						if (a.exists_in_app && !b.exists_in_app) return 1;
+						if (!a.exists_in_app && b.exists_in_app) return -1;
+						return 0;
+					});
+					
+					inquilinosListDiv.innerHTML = inquilinosOrdenados.map(i => `
+                        <div class="p-4 border-b border-gray-200 dark:border-gray-600 last:border-b-0 ${i.exists_in_app ? 'bg-gray-50 dark:bg-gray-700/50 opacity-60' : 'hover:bg-gray-50 dark:hover:bg-gray-700/30'}">
+                            <div class="flex items-start justify-between">
+                                <div class="flex-1">
+                                    <p class="font-semibold text-gray-900 dark:text-white text-sm">
+                                        ${i.nombre || 'Nombre N/A'}
+                                    </p>
+                                    <div class="mt-2 text-xs text-gray-600 dark:text-gray-400">
+                                        <span><i class="fas fa-id-card mr-1"></i>NIF: ${i.nif || '-'}</span>
+                                        ${!i.exists_in_app && i.direccion ? `<br><span><i class="fas fa-map-marker-alt mr-1"></i>${i.direccion}</span>` : ''}
+                                    </div>
+                                </div>
+                                <div class="ml-3">
+                                    ${i.exists_in_app ? 
+                                        '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400 rounded-full"><i class="fas fa-exclamation-triangle mr-1"></i>Ya existe</span>' : 
+                                        '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400 rounded-full"><i class="fas fa-plus mr-1"></i>Nuevo</span>'
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    inquilinosListDiv.innerHTML = `
+                        <div class="p-6 text-center">
+                            <div class="inline-flex items-center justify-center w-12 h-12 bg-gray-100 dark:bg-gray-700 rounded-full mb-3">
+                                <i class="fas fa-users text-gray-400"></i>
+                            </div>
+                            <p class="text-gray-500 dark:text-gray-400">No se encontraron inquilinos asociados</p>
+                        </div>
+                    `;
+                }
+                
+                // Habilitar botón si hay elementos nuevos para importar
+                if (dataForFinalImport.propiedades_a_crear.length > 0 || dataForFinalImport.inquilinos_a_crear.length > 0) {
+                    executeButton.disabled = false;
+                    statusDiv.innerHTML = `
+                        <div class="inline-flex items-center text-green-600 dark:text-green-400">
+                            <i class="fas fa-check-circle mr-2"></i>
+                            <span>Listo para importar: ${dataForFinalImport.propiedades_a_crear.length} propiedades y ${dataForFinalImport.inquilinos_a_crear.length} inquilinos</span>
+                        </div>
+                    `;
+                } else {
+                    statusDiv.innerHTML = `
+                        <div class="inline-flex items-center text-blue-600 dark:text-blue-400">
+                            <i class="fas fa-info-circle mr-2"></i>
+                            <span>No hay elementos nuevos para importar</span>
+                        </div>
+                    `;
+                }
+
+            } else {
+                statusDiv.innerHTML = `
+                    <div class="inline-flex items-center text-red-600 dark:text-red-400">
+                        <i class="fas fa-times-circle mr-2"></i>
+                        <span>${result.error || 'Error al obtener datos de BD Fiscal'}</span>
+                    </div>
+                `;
+                propsListDiv.innerHTML = `
+                    <div class="p-6 text-center">
+                        <div class="inline-flex items-center justify-center w-12 h-12 bg-red-100 dark:bg-red-900/50 rounded-full mb-3">
+                            <i class="fas fa-times text-red-500"></i>
+                        </div>
+                        <p class="text-red-500 dark:text-red-400">Error al cargar propiedades</p>
+                    </div>
+                `;
+                inquilinosListDiv.innerHTML = `
+                    <div class="p-6 text-center">
+                        <div class="inline-flex items-center justify-center w-12 h-12 bg-red-100 dark:bg-red-900/50 rounded-full mb-3">
+                            <i class="fas fa-times text-red-500"></i>
+                        </div>
+                        <p class="text-red-500 dark:text-red-400">Error al cargar inquilinos</p>
+                    </div>
+                `;
+            }
+        } catch (error) {
+            console.error("Error en fetchAssetsForOwner:", error);
+            statusDiv.innerHTML = `
+                <div class="inline-flex items-center text-red-600 dark:text-red-400">
+                    <i class="fas fa-exclamation-triangle mr-2"></i>
+                    <span>Error de conexión: ${error.message}</span>
+                </div>
+            `;
+            showToastNotification(`Error de conexión: ${error.message}`, 'error');
+        }
+    }
+
+    async function executeActualFiscalImport() {
+        const statusDiv = document.getElementById('fiscalImportStatus');
+        const executeButton = document.getElementById('executeFiscalImportButton');
+        const csrfTokenValue = document.querySelector('#createOwnerForm input[name="csrf_token"]')?.value || 
+                               document.querySelector('meta[name="csrf-token"]')?.content || '';
+
+        if (!dataForFinalImport) {
+            if(statusDiv) statusDiv.innerHTML = `
+                <div class="inline-flex items-center text-red-600 dark:text-red-400">
+                    <i class="fas fa-times-circle mr-2"></i>
+                    <span>Error: No hay datos para importar</span>
+                </div>
+            `;
+            return;
+        }
+        if (!csrfTokenValue){
+            if(statusDiv) statusDiv.innerHTML = `
+                <div class="inline-flex items-center text-red-600 dark:text-red-400">
+                    <i class="fas fa-shield-alt mr-2"></i>
+                    <span>Error: Falta token de seguridad</span>
+                </div>
+            `;
+            console.error("CSRF Token no encontrado para executeActualFiscalImport");
+            return;
+        }
+
+        if (statusDiv) statusDiv.innerHTML = `
+            <div class="inline-flex items-center text-blue-600 dark:text-blue-400">
+                <i class="fas fa-spinner fa-spin mr-2"></i>
+                <span>Importando datos al sistema...</span>
+            </div>
+        `;
+        if (executeButton) executeButton.disabled = true;
+
+        const payload = {
+            propietario_app_id: dataForFinalImport.propietario_app_id,
+            propiedades: dataForFinalImport.propiedades_a_crear || [],
+            inquilinos: dataForFinalImport.inquilinos_a_crear || []
+        };
+
+        try {
+            const response = await fetch(`{{ url_for('external_db_api_bp.execute_import_owner_assets') }}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfTokenValue
+                },
+                body: JSON.stringify(payload)
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                if(statusDiv) statusDiv.innerHTML = `
+                    <div class="inline-flex items-center text-green-600 dark:text-green-400">
+                        <i class="fas fa-check-circle mr-2"></i>
+                        <span>${result.message || 'Importación completada exitosamente'}</span>
+                    </div>
+                `;
+                
+                // Usar el sistema de notificaciones profesional de base.html
+                if (typeof window.showImportSuccess === 'function') {
+                    window.showImportSuccess(
+                        dataForFinalImport.propiedades_a_crear.length,
+                        dataForFinalImport.inquilinos_a_crear.length
+                    );
+                } else {
+                    showToastNotification(result.message || 'Importación completada exitosamente', 'success');
+                }
+                
+                setTimeout(() => {
+                    closeModal('confirmFiscalImportModal');
+                    window.location.reload();
+                }, 5000);
+            } else {
+                if(statusDiv) statusDiv.innerHTML = `
+                    <div class="inline-flex items-center text-red-600 dark:text-red-400">
+                        <i class="fas fa-times-circle mr-2"></i>
+                        <span>${result.error || 'Error durante la importación'}</span>
+                    </div>
+                `;
+                showToastNotification(result.error || 'Error durante la importación', 'error');
+            }
+        } catch (error) {
+            console.error("Error en executeActualFiscalImport:", error);
+            if(statusDiv) statusDiv.innerHTML = `
+                <div class="inline-flex items-center text-red-600 dark:text-red-400">
+                    <i class="fas fa-exclamation-triangle mr-2"></i>
+                    <span>Error de red: ${error.message}</span>
+                </div>
+            `;
+            showToastNotification(`Error de red: ${error.message}`, 'error');
+        } finally {
+            if (executeButton) executeButton.disabled = false;
+        }
+    }
+
+    // Sistema de notificaciones mejorado (fallback si no existe en base.html)
+    function showToastNotification(message, type = 'success', duration = 5000) {
+        // Verificar si existe la función global
+        if (typeof window.showProfessionalFlashMessage === 'function') {
+            window.showProfessionalFlashMessage(message, type);
+            return;
+        }
+        
+        // Fallback: crear notificación simple
+        const colors = {
+            success: { bg: 'bg-green-500', icon: 'fa-check' },
+            error: { bg: 'bg-red-500', icon: 'fa-times' },
+            warning: { bg: 'bg-yellow-500', icon: 'fa-exclamation-triangle' },
+            info: { bg: 'bg-blue-500', icon: 'fa-info-circle' }
+        };
+        
+        const color = colors[type] || colors.success;
+        
+        const toast = document.createElement('div');
+        toast.className = `fixed top-4 right-4 ${color.bg} text-white px-6 py-4 rounded-lg shadow-lg z-50 transform transition-all duration-300 translate-x-full`;
+        toast.innerHTML = `
+            <div class="flex items-center space-x-3">
+                <i class="fas ${color.icon}"></i>
+                <span class="font-medium">${message}</span>
+                <button onclick="this.parentElement.parentElement.remove()" class="ml-2 text-white/80 hover:text-white">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        `;
+        
+        document.body.appendChild(toast);
+        
+        // Animar entrada
+        setTimeout(() => {
+            toast.classList.remove('translate-x-full');
+        }, 100);
+        
+        // Auto-remove
+        setTimeout(() => {
+            toast.classList.add('translate-x-full');
+            setTimeout(() => {
+                if (toast.parentNode) {
+                    toast.parentNode.removeChild(toast);
+                }
+            }, 300);
+        }, duration);
+    }
+
+	// Detectar y mostrar capacidades del navegador al cargar la página
+	document.addEventListener('DOMContentLoaded', function() {
+		const supportsModernAPI = 'showDirectoryPicker' in window;
+		const supportsWebkitDirectory = !!document.createElement('input').webkitdirectory;
+
+        makeOwnerRowsClickable();
+		
+		console.log('Capacidades del navegador:');
+		console.log('- File System Access API:', supportsModernAPI);
+		console.log('- webkitdirectory:', supportsWebkitDirectory);
+		
+		if (!supportsModernAPI && !supportsWebkitDirectory) {
+			console.warn('Este navegador no soporta selección de carpetas. Los usuarios deberán escribir las rutas manualmente.');
+		}
+        
+        // Inicializar contadores de búsqueda
+        const rows = document.querySelectorAll('#ownersTable tr.owner-row');
+        updateSearchResults(rows.length, rows.length, '');
+	});
+
+    // Mejorar accesibilidad con navegación por teclado
+    document.addEventListener('keydown', function(e) {
+        // Abrir modal de crear con Ctrl+N
+        if (e.ctrlKey && e.key === 'n') {
+            e.preventDefault();
+            const createButton = document.querySelector('button[onclick="showCreateOwnerModal()"]');
+            if (createButton && !createButton.disabled) {
+                showCreateOwnerModal();
+            }
+        }
+        
+        // Enfocar búsqueda con Ctrl+F
+        if (e.ctrlKey && e.key === 'f') {
+            e.preventDefault();
+            const searchInput = document.getElementById('ownerSearch');
+            if (searchInput) {
+                searchInput.focus();
+                searchInput.select();
+            }
+        }
+    });
+
+    // Función para resaltar texto en resultados de búsqueda
+    function highlightSearchTerms(text, searchTerm) {
+        if (!searchTerm) return text;
+        
+        const regex = new RegExp(`(${searchTerm})`, 'gi');
+        return text.replace(regex, '<mark class="bg-yellow-200 dark:bg-yellow-600 px-1 rounded">$1</mark>');
+    }
+
+    // Función para exportar resultados de búsqueda (opcional)
+    function exportSearchResults() {
+        const visibleRows = document.querySelectorAll('#ownersTable tr.owner-row:not([style*="display: none"])');
+        const data = Array.from(visibleRows).map(row => ({
+            nombre: row.querySelector('.owner-nombre').textContent,
+            nif: row.querySelector('.owner-nif').textContent,
+            telefono: row.querySelector('.owner-telefono').textContent,
+            email: row.querySelector('.owner-email').textContent,
+            propiedades: row.querySelector('.bg-green-100').textContent
+        }));
+        
+        const csv = [
+            ['Nombre', 'NIF', 'Teléfono', 'Email', 'Propiedades'],
+            ...data.map(row => [row.nombre, row.nif, row.telefono, row.email, row.propiedades])
+        ].map(row => row.join(',')).join('\n');
+        
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `propietarios_${new Date().toISOString().split('T')[0]}.csv`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+    }
+
+    // Función para estadísticas rápidas
+    function showQuickStats() {
+        const rows = document.querySelectorAll('#ownersTable tr.owner-row');
+        const totalPropiedades = Array.from(rows).reduce((sum, row) => {
+            const propCount = parseInt(row.querySelector('.bg-green-100').textContent) || 0;
+            return sum + propCount;
+        }, 0);
+        
+        const stats = {
+            totalPropietarios: rows.length,
+            totalPropiedades: totalPropiedades,
+            promedioPropiedades: rows.length > 0 ? (totalPropiedades / rows.length).toFixed(1) : 0
+        };
+        
+        showToastNotification(
+            `${stats.totalPropietarios} propietarios • ${stats.totalPropiedades} propiedades • Promedio: ${stats.promedioPropiedades}`,
+            'info',
+            8000
+        );
+    }
+
+    // Agregar atajos de teclado para funciones adicionales
+    document.addEventListener('keydown', function(e) {
+        // Mostrar estadísticas con Ctrl+I
+        if (e.ctrlKey && e.key === 'i') {
+            e.preventDefault();
+            showQuickStats();
+        }
+        
+        // Exportar con Ctrl+E
+        if (e.ctrlKey && e.key === 'e') {
+            e.preventDefault();
+            if (document.querySelectorAll('#ownersTable tr.owner-row:not([style*="display: none"])').length > 0) {
+                exportSearchResults();
+                showToastNotification('Datos exportados correctamente', 'success');
+            } else {
+                showToastNotification('No hay datos para exportar', 'warning');
+            }
+        }
+    });
+
+    // Función para validar formularios en tiempo real
+    function setupFormValidation() {
+        const nifInput = document.getElementById('create_nif');
+        const emailInput = document.getElementById('create_email');
+        const ibanInput = document.getElementById('create_cuenta_bancaria');
+        
+        if (nifInput) {
+            nifInput.addEventListener('blur', function() {
+                validateNIF(this);
+            });
+        }
+        
+        if (emailInput) {
+            emailInput.addEventListener('blur', function() {
+                validateEmail(this);
+            });
+        }
+        
+        if (ibanInput) {
+            ibanInput.addEventListener('blur', function() {
+                validateIBAN(this);
+            });
+        }
+    }
+
+    function validateNIF(input) {
+        const nif = input.value.trim().toUpperCase();
+        const nifRegex = /^[0-9]{8}[TRWAGMYFPDXBNJZSQVHLCKE]$/;
+        const nieRegex = /^[XYZ][0-9]{7}[TRWAGMYFPDXBNJZSQVHLCKE]$/;
+        const cifRegex = /^[ABCDEFGHJNPQRSUVW][0-9]{7}[0-9A-J]$/;
+        
+        const isValid = nifRegex.test(nif) || nieRegex.test(nif) || cifRegex.test(nif);
+        
+        if (nif && !isValid) {
+            input.classList.add('border-red-500', 'dark:border-red-600');
+            showFieldError(input, 'Formato de NIF/CIF no válido');
+        } else {
+            input.classList.remove('border-red-500', 'dark:border-red-600');
+            hideFieldError(input);
+        }
+    }
+
+    function validateEmail(input) {
+        const email = input.value.trim();
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        
+        if (email && !emailRegex.test(email)) {
+            input.classList.add('border-red-500', 'dark:border-red-600');
+            showFieldError(input, 'Formato de email no válido');
+        } else {
+            input.classList.remove('border-red-500', 'dark:border-red-600');
+            hideFieldError(input);
+        }
+    }
+
+    function validateIBAN(input) {
+        const iban = input.value.trim().toUpperCase().replace(/\s/g, '');
+        const ibanRegex = /^[A-Z]{2}[0-9]{2}[A-Z0-9]{4}[0-9]{7}([A-Z0-9]?){0,16}$/;
+        
+        if (iban && !ibanRegex.test(iban)) {
+            input.classList.add('border-red-500', 'dark:border-red-600');
+            showFieldError(input, 'Formato de IBAN no válido');
+        } else {
+            input.classList.remove('border-red-500', 'dark:border-red-600');
+            hideFieldError(input);
+            // Formatear IBAN con espacios para mejor legibilidad
+            if (iban) {
+                input.value = iban.replace(/(.{4})/g, '$1 ').trim();
+            }
+        }
+    }
+
+    function showFieldError(input, message) {
+        hideFieldError(input); // Limpiar error previo
+        
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'field-error text-red-500 text-xs mt-1';
+        errorDiv.textContent = message;
+        
+        input.parentNode.insertBefore(errorDiv, input.nextSibling);
+    }
+
+    function hideFieldError(input) {
+        const errorDiv = input.parentNode.querySelector('.field-error');
+        if (errorDiv) {
+            errorDiv.remove();
+        }
+    }
+
+    // Inicializar validaciones cuando el DOM esté listo
+    document.addEventListener('DOMContentLoaded', setupFormValidation);
+
+    // Función para mejorar la experiencia de usuario con loading states
+    function showLoadingState(button, originalText = null) {
+        if (!originalText) {
+            originalText = button.innerHTML;
+        }
+        button.disabled = true;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Procesando...';
+        
+        // Guardar el texto original para restaurarlo después
+        button.setAttribute('data-original-text', originalText);
+    }
+
+    function hideLoadingState(button) {
+        const originalText = button.getAttribute('data-original-text');
+        if (originalText) {
+            button.innerHTML = originalText;
+            button.removeAttribute('data-original-text');
+        }
+        button.disabled = false;
+    }
+
+    // Aplicar loading states a botones de formularios
+    document.addEventListener('DOMContentLoaded', function() {
+        const forms = document.querySelectorAll('form');
+        forms.forEach(form => {
+            form.addEventListener('submit', function(e) {
+                const submitButton = form.querySelector('button[type="submit"]');
+                if (submitButton) {
+                    showLoadingState(submitButton);
+                }
+            });
+        });
+    });
+
+    // === AYUDA CONTEXTUAL ===
+    function showKeyboardShortcuts() {
+        const shortcuts = [
+            { key: 'Ctrl + N', action: 'Nuevo propietario' },
+            { key: 'Ctrl + F', action: 'Buscar propietarios' },
+            { key: 'Ctrl + I', action: 'Mostrar estadísticas' },
+            { key: 'Ctrl + E', action: 'Exportar resultados' },
+            { key: 'Escape', action: 'Cerrar modales' }
+        ];
+        
+        const shortcutsHtml = shortcuts.map(s => 
+            `<div class="flex justify-between py-1">
+                <span class="text-gray-600 dark:text-gray-400">${s.action}</span>
+                <kbd class="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs font-mono">${s.key}</kbd>
+            </div>`
+        ).join('');
+        
+        const helpModal = document.createElement('div');
+        helpModal.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-50';
+        helpModal.innerHTML = `
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Atajos de Teclado</h3>
+                    <button onclick="this.closest('.fixed').remove()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="space-y-2">
+                    ${shortcutsHtml}
+                </div>
+                <div class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600 text-center">
+                    <button onclick="this.closest('.fixed').remove()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                        Entendido
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(helpModal);
+    }
+
+    // Mostrar ayuda con F1
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'F1') {
+            e.preventDefault();
+            showKeyboardShortcuts();
+        }
+    });
+
+    console.log('🏠 Sistema de Propietarios cargado correctamente');
+    console.log('💡 Presiona F1 para ver los atajos de teclado disponibles');
+</script>
+{% endblock %}				

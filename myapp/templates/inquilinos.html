@@ -1,0 +1,814 @@
+{% extends 'base.html' %}
+
+{% block title %}Inquilinos - RentalSys{% endblock %}
+{% block header_title %}Inquilinos{% endblock %}
+
+{% block content %}
+<!-- CONTENEDOR PRINCIPAL CON ALTURA COMPLETA -->
+<div class="h-full flex flex-col overflow-hidden">
+    <!-- HEADER FIJO -->
+    <div class="flex-shrink-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-30">
+        <!-- Título y botones -->
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6 p-6 pb-4">
+            <h2 class="text-2xl font-semibold text-gray-800 dark:text-gray-100 mb-4 md:mb-0">👥 Gestión de Inquilinos</h2>
+            <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+                <button onclick="showCreateTenantModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md flex items-center focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+                    <i class="fas fa-plus mr-2"></i> Nuevo inquilino
+                </button>
+                <div class="relative">
+                    <input type="text" id="tenantSearch" placeholder="Buscar inquilinos..." class="form-input pl-10 pr-4 py-2 border border-gray-300 rounded-md w-full focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200" onkeyup="searchTenants()">
+                    <div class="absolute left-3 top-2.5 text-gray-400">
+                        <i class="fas fa-search"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CONTENEDOR DE TABLA CON SCROLL -->
+    <div class="flex-1 overflow-hidden">
+        <div class="h-full bg-white dark:bg-gray-800 rounded-lg shadow mx-6 mb-6 overflow-hidden">
+            <!-- TABLA CON SCROLL INDEPENDIENTE -->
+            <div class="h-full overflow-y-auto">
+                <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                    <thead class="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Nombre</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">DNI/NIE</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Teléfono</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Email</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Estado</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Fechas Relación</th>
+                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tenantsTable" class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                         {% if inquilinos %}
+                            {% for tenant in inquilinos %}
+                            <tr class="highlight-row tenant-row hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                                data-id="{{ tenant.id }}"
+                                data-nombre="{{ tenant.nombre | e }}"
+                                data-nif="{{ tenant.nif | e }}"
+                                data-direccion="{{ tenant.direccion | default('', true) | e }}"
+                                data-cp="{{ tenant.codigo_postal | default('', true) | e }}"
+                                data-poblacion="{{ tenant.ciudad | default('', true) | e }}"
+                                data-telefono="{{ tenant.telefono | default('', true) | e }}"
+                                data-email="{{ tenant.email | default('', true) | e }}"
+                                data-estado="{{ tenant.estado }}"
+                                data-fecha-inicio="{{ tenant.fecha_inicio_relacion.isoformat() if tenant.fecha_inicio_relacion else '' }}"
+                                data-fecha-fin="{{ tenant.fecha_fin_relacion.isoformat() if tenant.fecha_fin_relacion else '' }}"
+                            >
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="flex items-center">
+                                        <div class="flex-shrink-0 h-10 w-10 rounded-full bg-green-100 dark:bg-green-900/50 flex items-center justify-center">
+                                            {% if tenant.estado == 'activo' %}
+                                                <i class="fas fa-user text-green-600 dark:text-green-400"></i>
+                                            {% elif tenant.estado == 'inactivo' %}
+                                                <i class="fas fa-user-slash text-red-600 dark:text-red-400"></i>
+                                            {% else %}
+                                                <i class="fas fa-user-clock text-yellow-600 dark:text-yellow-400"></i>
+                                            {% endif %}
+                                        </div>
+                                        <div class="ml-4">
+                                            <div class="text-sm font-medium text-gray-900 dark:text-white">{{ tenant.nombre }}</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm text-gray-500 dark:text-gray-400">{{ tenant.nif | default('-') }}</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm text-gray-500 dark:text-gray-400">{{ tenant.telefono | default('-') }}</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <a href="mailto:{{ tenant.email }}" class="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 hover:underline" title="Enviar email a {{ tenant.email }}">
+                                        {{ tenant.email | default('-') }}
+                                    </a>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    {% if tenant.estado == 'activo' %}
+                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300">Activo</span>
+                                    {% elif tenant.estado == 'inactivo' %}
+                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-300">Inactivo</span>
+                                    {% elif tenant.estado == 'pendiente' %}
+                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-300">Pendiente</span>
+                                    {% else %}
+                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300">
+                                            {{ tenant.estado | capitalize }}
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                     <div class="text-sm text-gray-500 dark:text-gray-400">
+                                         {{ tenant.fecha_inicio_relacion | date if tenant.fecha_inicio_relacion else 'N/A' }}
+                                          -
+                                         {{ tenant.fecha_fin_relacion | date if tenant.fecha_fin_relacion else 'Presente' }}
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+                                    <button onclick="editTenant(this)" class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300" title="Editar">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button onclick="deleteTenant({{ tenant.id }})" class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300" title="Eliminar">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="7" class="px-6 py-8 whitespace-nowrap text-center text-sm text-gray-500 dark:text-gray-400">
+                                    <div class="flex flex-col items-center space-y-2">
+                                        <i class="fas fa-users text-3xl text-gray-300 dark:text-gray-600"></i>
+                                        <p>No hay inquilinos registrados.</p>
+                                        <p class="text-xs">Puedes crear uno usando el botón "Nuevo inquilino"</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- FOOTER DE LA TABLA FIJO -->
+            <div class="bg-gray-50 dark:bg-gray-900/50 px-6 py-3 flex items-center justify-between border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
+                 <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                     <div>
+                         <p class="text-sm text-gray-700 dark:text-gray-300">
+                             Mostrando
+                             <span class="font-medium">1</span>
+                             a
+                             <span class="font-medium">{{ inquilinos|length }}</span>
+                             de
+                             <span class="font-medium">{{ inquilinos|length }}</span>
+                             resultados
+                         </p>
+                     </div>
+                     <div>
+                         <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                             <a href="#" class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700">
+                                 <i class="fas fa-chevron-left h-5 w-5"></i>
+                             </a>
+                             <a href="#" aria-current="page" class="z-10 bg-blue-50 dark:bg-blue-900/50 border-blue-500 text-blue-600 dark:text-blue-400 relative inline-flex items-center px-4 py-2 border text-sm font-medium">1</a>
+                             <a href="#" class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700">
+                                 <i class="fas fa-chevron-right h-5 w-5"></i>
+                             </a>
+                         </nav>
+                     </div>
+                 </div>
+             </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Crear Inquilino -->
+<div id="createTenantModal" class="fixed inset-0 overflow-y-auto hidden z-50" role="dialog" aria-labelledby="create-tenant-modal-title" aria-modal="true">
+    <div class="flex items-end justify-center min-h-screen px-4 pb-20 text-center sm:block sm:p-0">
+        <!-- Backdrop con blur -->
+        <div class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm transition-opacity" aria-hidden="true"></div>
+        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">​</span>
+        
+        <div class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-xl overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl w-full modal-content">
+            <form id="createTenantForm" action="{{ url_for('inquilinos_bp.add_inquilino') }}" method="POST" novalidate>
+                {{ csrf_form.csrf_token }}
+                
+                <!-- Header del Modal -->
+                <div class="bg-gradient-to-r from-green-600 to-teal-600 px-6 py-4">
+                    <div class="flex items-center justify-between">
+                        <h3 id="create-tenant-modal-title" class="text-xl font-semibold text-white flex items-center">
+                            <i class="fas fa-user-plus mr-3"></i>
+                            Nuevo Inquilino
+                        </h3>
+                        <button type="button" onclick="closeModal('createTenantModal')" 
+                                class="text-white/80 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-white/50 rounded-lg p-1">
+                            <i class="fas fa-times text-xl"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Body del Modal -->
+                <div class="px-6 py-4 max-h-[calc(100vh-200px)] overflow-y-auto modal-body">
+                    <div class="space-y-3">
+                        <!-- NIF con búsqueda externa -->
+                        <div class="flex items-stretch">
+                            <div class="relative flex-1">
+                                <input type="text" id="tenantNIF" name="tenantNIF" required placeholder="DNI/NIF *" class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-l-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all">
+                                <i class="fas fa-id-card absolute left-2.5 top-2.5 text-gray-400 text-sm"></i>
+                            </div>
+                            <button type="button" onclick="fetchExternalTenantData()" 
+                                    class="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-4 py-2 rounded-r-lg text-sm flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all shadow hover:shadow-lg"
+                                    title="Buscar y autocompletar desde BD GENERAL">
+                                <i class="fas fa-database mr-1"></i>
+                                <span class="hidden sm:inline">Buscar</span>
+                            </button>
+                        </div>
+                        <div id="externalTenantLookupStatus" class="text-xs mt-1 min-h-[1.2em] transition-all duration-300"></div>
+
+                        <!-- Nombre -->
+                        <div class="relative">
+                            <input type="text" id="tenantName" name="tenantName" required placeholder="Nombre completo *" class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all">
+                            <i class="fas fa-user absolute left-2.5 top-2.5 text-gray-400 text-sm"></i>
+                        </div>
+
+                        <!-- Dirección -->
+                        <div class="relative">
+                            <input type="text" id="tenantAddress" name="tenantAddress" placeholder="Dirección completa" class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all">
+                            <i class="fas fa-map-marker-alt absolute left-2.5 top-2.5 text-gray-400 text-sm"></i>
+                        </div>
+                        
+                        <!-- Código Postal y Ciudad -->
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                            <div class="relative">
+                                <input type="text" id="tenantCP" name="tenantCP" placeholder="C.P." class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all">
+                                <i class="fas fa-mail-bulk absolute left-2.5 top-2.5 text-gray-400 text-sm"></i>
+                            </div>
+                            <div class="relative sm:col-span-2">
+                                <input type="text" id="tenantCity" name="tenantCity" placeholder="Ciudad/Población" class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all">
+                                <i class="fas fa-city absolute left-2.5 top-2.5 text-gray-400 text-sm"></i>
+                            </div>
+                        </div>
+
+                        <!-- Teléfono y Email -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <div class="relative">
+                                <input type="tel" id="tenantPhone" name="tenantPhone" placeholder="Teléfono" class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all">
+                                <i class="fas fa-phone absolute left-2.5 top-2.5 text-gray-400 text-sm"></i>
+                            </div>
+                            <div class="relative">
+                                <input type="email" id="tenantEmail" name="tenantEmail" placeholder="Email" class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all">
+                                <i class="fas fa-envelope absolute left-2.5 top-2.5 text-gray-400 text-sm"></i>
+                            </div>
+                        </div>
+
+                        <!-- Estado -->
+                        <div class="relative">
+                            <select id="tenantStatus" name="tenantStatus" class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all">
+                                <option value="activo" selected>Activo</option>
+                                <option value="pendiente">Pendiente</option>
+                                <option value="inactivo">Inactivo</option>
+                            </select>
+                            <i class="fas fa-toggle-on absolute left-2.5 top-2.5 text-gray-400 text-sm"></i>
+                        </div>
+                        
+                        <!-- Fechas de Relación -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <div class="relative">
+                                <input type="date" id="tenantStartDate" name="tenantStartDate" class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all">
+                                <i class="fas fa-calendar-plus absolute left-2.5 top-2.5 text-gray-400 text-sm"></i>
+                                <label class="absolute -top-2 left-2 px-1 text-xs text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-800">Fecha inicio</label>
+                            </div>
+                            <div class="relative">
+                                <input type="date" id="tenantEndDate" name="tenantEndDate" class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all">
+                                <i class="fas fa-calendar-minus absolute left-2.5 top-2.5 text-gray-400 text-sm"></i>
+                                <label class="absolute -top-2 left-2 px-1 text-xs text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-800">Fecha fin</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Footer del Modal -->
+                <div class="bg-gray-50 dark:bg-gray-900/50 px-6 py-4 flex items-center justify-between border-t border-gray-200 dark:border-gray-700">
+                    <div class="text-xs text-gray-500 dark:text-gray-400 flex items-center">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        Los campos marcados con * son obligatorios
+                    </div>
+                    <div class="flex space-x-2">
+                        <button type="button" onclick="closeModal('createTenantModal')"
+                                class="px-4 py-2 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 font-medium text-sm transition-colors flex items-center">
+                            <i class="fas fa-times mr-2"></i>
+                            Cancelar
+                        </button>
+                        <button type="submit" id="createTenantSubmitButton"
+                                class="px-4 py-2 rounded-lg bg-gradient-to-r from-green-600 to-teal-600 text-white hover:from-green-700 hover:to-teal-700 font-medium text-sm transition-all flex items-center shadow hover:shadow-lg">
+                            <i class="fas fa-save mr-2"></i>
+                            Guardar Inquilino
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Editar Inquilino -->
+<div id="editTenantModal" class="fixed inset-0 overflow-y-auto hidden z-50" role="dialog" aria-labelledby="edit-tenant-modal-title" aria-modal="true">
+    <div class="flex items-end justify-center min-h-screen px-4 pb-20 text-center sm:block sm:p-0">
+        <div class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm transition-opacity" aria-hidden="true"></div>
+        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">​</span>
+        
+        <div class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-xl overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl w-full modal-content">
+            <form id="editTenantForm" action="" method="POST" novalidate>
+                {{ csrf_form.csrf_token }}
+                <input type="hidden" id="editingTenantOriginalNif" value=""> {# Para almacenar el NIF original #}
+                
+                <div class="bg-gradient-to-r from-green-600 to-teal-600 px-6 py-4">
+                    <div class="flex items-center justify-between">
+                        <h3 id="edit-tenant-modal-title" class="text-xl font-semibold text-white flex items-center">
+                            <i class="fas fa-user-edit mr-3"></i>
+                            Editar Inquilino
+                        </h3>
+                        <button type="button" onclick="closeModal('editTenantModal')" 
+                                class="text-white/80 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-white/50 rounded-lg p-1">
+                            <i class="fas fa-times text-xl"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="px-6 py-4 max-h-[calc(100vh-200px)] overflow-y-auto modal-body">
+                    <div class="space-y-3">
+                        <!-- NIF con búsqueda externa -->
+                        <div class="flex items-stretch">
+                            <div class="relative flex-1">
+                                <input type="text" id="editTenantNIF" name="editTenantNIF" required 
+                                       class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-l-lg bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all" 
+                                       readonly placeholder="DNI/NIF *">
+                                <i class="fas fa-id-card absolute left-2.5 top-2.5 text-gray-400 text-sm"></i>
+                            </div>
+                            <button type="button" onclick="fetchExternalTenantDataForEdit()" 
+                                    class="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-4 py-2 rounded-r-lg text-sm flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all shadow hover:shadow-lg"
+                                    title="Actualizar datos desde BD GENERAL (DATOSFIS) para este NIF">
+                                <i class="fas fa-sync-alt mr-1"></i>
+                                <span class="hidden sm:inline">Actualizar</span>
+                            </button>
+                        </div>
+                        <div id="externalEditTenantLookupStatus" class="text-xs mt-1 min-h-[1.2em] transition-all duration-300"></div>
+
+                        <!-- Nombre -->
+                        <div class="relative">
+                            <input type="text" id="editTenantNombre" name="editTenantNombre" required placeholder="Nombre completo *" class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all">
+                            <i class="fas fa-user absolute left-2.5 top-2.5 text-gray-400 text-sm"></i>
+                        </div>
+
+                        <!-- Dirección -->
+                        <div class="relative">
+                            <input type="text" id="editTenantDireccion" name="editTenantDireccion" placeholder="Dirección completa" class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all">
+                            <i class="fas fa-map-marker-alt absolute left-2.5 top-2.5 text-gray-400 text-sm"></i>
+                        </div>
+                        
+                        <!-- Código Postal y Ciudad -->
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                            <div class="relative">
+                                <input type="text" id="editTenantCP" name="editTenantCP" placeholder="C.P." class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all">
+                                <i class="fas fa-mail-bulk absolute left-2.5 top-2.5 text-gray-400 text-sm"></i>
+                            </div>
+                            <div class="relative sm:col-span-2">
+                                <input type="text" id="editTenantPoblacion" name="editTenantPoblacion" placeholder="Ciudad/Población" class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all">
+                                <i class="fas fa-city absolute left-2.5 top-2.5 text-gray-400 text-sm"></i>
+                            </div>
+                        </div>
+
+                        <!-- Teléfono y Email -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <div class="relative">
+                                <input type="tel" id="editTenantTelefono" name="editTenantTelefono" placeholder="Teléfono" class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all">
+                                <i class="fas fa-phone absolute left-2.5 top-2.5 text-gray-400 text-sm"></i>
+                            </div>
+                            <div class="relative">
+                                <input type="email" id="editTenantEmail" name="editTenantEmail" placeholder="Email (manual)" class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all">
+                                <i class="fas fa-envelope absolute left-2.5 top-2.5 text-gray-400 text-sm"></i>
+                            </div>
+                        </div>
+
+                        <!-- Estado -->
+                        <div class="relative">
+                            <select id="editTenantStatus" name="editTenantStatus" class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all">
+                                <option value="activo">Activo</option>
+                                <option value="pendiente">Pendiente</option>
+                                <option value="inactivo">Inactivo</option>
+                            </select>
+                            <i class="fas fa-toggle-on absolute left-2.5 top-2.5 text-gray-400 text-sm"></i>
+                        </div>
+                        
+                        <!-- Fechas de Relación -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <div class="relative">
+                                <input type="date" id="editTenantStartDate" name="editTenantStartDate" class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all">
+                                <i class="fas fa-calendar-plus absolute left-2.5 top-2.5 text-gray-400 text-sm"></i>
+                                <label class="absolute -top-2 left-2 px-1 text-xs text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-800">Fecha inicio</label>
+                            </div>
+                            <div class="relative">
+                                <input type="date" id="editTenantEndDate" name="editTenantEndDate" class="form-input w-full pl-8 pr-3 py-2 text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all">
+                                <i class="fas fa-calendar-minus absolute left-2.5 top-2.5 text-gray-400 text-sm"></i>
+                                <label class="absolute -top-2 left-2 px-1 text-xs text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-800">Fecha fin</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Footer del Modal -->
+                <div class="bg-gray-50 dark:bg-gray-900/50 px-6 py-4 flex items-center justify-between border-t border-gray-200 dark:border-gray-700">
+                    <div class="text-xs text-gray-500 dark:text-gray-400 flex items-center">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        Los campos marcados con * son obligatorios
+                    </div>
+                    <div class="flex space-x-2">
+                        <button type="button" onclick="closeModal('editTenantModal')"
+                                class="px-4 py-2 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 font-medium text-sm transition-colors flex items-center">
+                            <i class="fas fa-times mr-2"></i>
+                            Cancelar
+                        </button>
+                        <button type="submit"
+                                class="px-4 py-2 rounded-lg bg-gradient-to-r from-green-600 to-teal-600 text-white hover:from-green-700 hover:to-teal-700 font-medium text-sm transition-all flex items-center shadow hover:shadow-lg">
+                            <i class="fas fa-save mr-2"></i>
+                            Guardar Cambios
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Confirmar Eliminación -->
+<div id="deleteTenantModal" class="fixed inset-0 overflow-y-auto hidden z-50">
+     <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+         <div class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm transition-opacity" aria-hidden="true"></div>
+         <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">​</span>
+         
+         <div class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+             <div class="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                 <div class="sm:flex sm:items-start">
+                     <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 dark:bg-red-900/30 sm:mx-0 sm:h-10 sm:w-10">
+                         <i class="fas fa-exclamation-triangle text-red-600 dark:text-red-400"></i>
+                     </div>
+                     <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                         <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white">Eliminar inquilino</h3>
+                         <div class="mt-2">
+                             <p class="text-sm text-gray-500 dark:text-gray-400">
+                                 ¿Estás seguro de que deseas eliminar este inquilino? Si tiene contratos o facturas asociados, no podrá ser eliminado. Esta acción no se puede deshacer.
+                             </p>
+                         </div>
+                     </div>
+                 </div>
+             </div>
+             <div class="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                  <button type="button" class="confirm-delete-button w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm">
+                      <i class="fas fa-trash mr-2"></i>
+                      Eliminar
+                  </button>
+                  <button type="button" onclick="closeModal('deleteTenantModal')" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-800 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                      Cancelar
+                  </button>
+             </div>
+         </div>
+     </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Muestra el modal para crear un nuevo inquilino
+    function showCreateTenantModal() {
+        try {
+            const form = document.getElementById('createTenantForm');
+            if (form) {
+                form.reset();
+                // Limpiar estado de búsqueda externa
+                const statusDiv = document.getElementById('externalTenantLookupStatus');
+                if(statusDiv) statusDiv.innerHTML = '';
+            }
+        } catch (e) { console.error("Error reseteando form crear inquilino:", e); }
+        showModal('createTenantModal');
+    }
+
+    // Prepara y muestra el modal para editar un inquilino
+        function editTenant(buttonElement) {
+        try {
+            const tenantRow = buttonElement.closest('tr.tenant-row');
+            if (!tenantRow) { console.error("Fila de inquilino no encontrada."); return; }
+            const tenantData = tenantRow.dataset;
+            const tenantId = tenantData.id;
+            if (!tenantId) { console.error("ID de inquilino no encontrado."); return; }
+
+            const nifOriginal = tenantData.nif || '';
+            document.getElementById('editTenantNIF').value = nifOriginal;
+            document.getElementById('editingTenantOriginalNif').value = nifOriginal; // Guardar el NIF original
+            
+            document.getElementById('editTenantNombre').value = tenantData.nombre || '';
+            document.getElementById('editTenantDireccion').value = tenantData.direccion || '';
+            document.getElementById('editTenantCP').value = tenantData.cp || '';
+            document.getElementById('editTenantPoblacion').value = tenantData.poblacion || '';
+            document.getElementById('editTenantTelefono').value = tenantData.telefono || '';
+            document.getElementById('editTenantEmail').value = tenantData.email || '';
+            document.getElementById('editTenantStatus').value = tenantData.estado || 'activo';
+            document.getElementById('editTenantStartDate').value = tenantData.fechaInicio || '';
+            document.getElementById('editTenantEndDate').value = tenantData.fechaFin || '';
+
+            const editForm = document.getElementById('editTenantForm');
+            if (editForm) {
+                 editForm.action = `{{ url_for('inquilinos_bp.edit_inquilino', id=0) }}`.replace('0', tenantId);
+            } else { console.error("Formulario 'editTenantForm' no encontrado."); return; }
+            
+            const statusDiv = document.getElementById('externalEditTenantLookupStatus');
+            if(statusDiv) statusDiv.innerHTML = ''; // Limpiar estado de búsqueda previo
+
+            showModal('editTenantModal');
+        } catch(e) { console.error("Error en editTenant:", e); alert("Ocurrió un error al preparar la edición.");}
+    }
+
+    // --- FUNCIÓN SIMPLIFICADA PARA ACTUALIZAR DATOS DEL INQUILINO EN EDICIÓN ---
+    async function fetchExternalTenantDataForEdit() {
+        const nifOriginalInput = document.getElementById('editingTenantOriginalNif'); // NIF original del inquilino que se edita
+        const statusDiv = document.getElementById('externalEditTenantLookupStatus');
+        
+        // Referencias a los campos del formulario de EDICIÓN
+        const nombreInput = document.getElementById('editTenantNombre');
+        const direccionInput = document.getElementById('editTenantDireccion');
+        const cpInput = document.getElementById('editTenantCP');
+        const ciudadInput = document.getElementById('editTenantPoblacion');
+        const telefonoInput = document.getElementById('editTenantTelefono');
+        // El campo NIF (editTenantNIF) no se modifica, solo se usa para la búsqueda.
+        // El campo Email, Estado, Fechas de relación no se modifican por esta acción.
+
+        if (!nifOriginalInput || !nifOriginalInput.value.trim()) {
+            if (statusDiv) statusDiv.innerHTML = '<span class="text-red-600 dark:text-red-400">Error: No se pudo obtener el NIF original del inquilino.</span>';
+            return;
+        }
+        const nifParaBuscar = nifOriginalInput.value.trim();
+
+        if (statusDiv) statusDiv.innerHTML = '<span class="text-blue-600 dark:text-blue-400"><i class="fas fa-spinner fa-spin mr-1"></i>Actualizando datos desde BD GENERAL...</span>';
+
+        try {
+            // La API `/lookup_inquilino_general/` ya comprueba si el NIF existe en nuestra app.
+            // Para edición, nos interesa principalmente si hay datos en la BD externa para ESE NIF.
+            const response = await fetch(`{{ url_for('external_db_api_bp.lookup_inquilino_from_general_db', nif_to_lookup='__NIF__') }}`.replace('__NIF__', encodeURIComponent(nifParaBuscar)));
+            const result = await response.json();
+
+            if (statusDiv) statusDiv.innerHTML = ''; 
+
+            if (response.ok) {
+                if (result.data) { // Si se encontraron datos en la BD externa para este NIF
+                    statusDiv.innerHTML = '<span class="text-green-600 dark:text-green-400"><i class="fas fa-check-circle mr-1"></i>Datos de BD GENERAL actualizados en el formulario.</span>';
+                    
+                    if (nombreInput) nombreInput.value = result.data.nombre || nombreInput.value;
+                    if (direccionInput) direccionInput.value = result.data.direccion || direccionInput.value;
+                    if (cpInput) cpInput.value = result.data.codigo_postal || cpInput.value;
+                    if (ciudadInput) ciudadInput.value = result.data.ciudad || ciudadInput.value;
+                    if (telefonoInput) telefonoInput.value = result.data.telefono || telefonoInput.value;
+                    // No se toca el NIF, email, estado, ni fechas.
+                    
+                     // Disparar evento input para que WTForms (o cualquier JS de validación) reaccione
+                    [nombreInput, direccionInput, cpInput, ciudadInput, telefonoInput].forEach(el => {
+                        if(el) el.dispatchEvent(new Event('input', { bubbles: true }));
+                    });
+
+                } else { // No se encontraron datos en BD externa para este NIF
+                    statusDiv.innerHTML = `<span class="text-gray-600 dark:text-gray-400">${result.message || 'No se encontraron datos en BD GENERAL para actualizar este NIF.'}</span>`;
+                }
+            } else { 
+                statusDiv.innerHTML = `<span class="text-red-600 dark:text-red-400">${result.error || 'Error al buscar datos externos.'}</span>`;
+            }
+        } catch (error) {
+            console.error('Error en fetchExternalTenantDataForEdit:', error);
+            if (statusDiv) statusDiv.innerHTML = '<span class="text-red-600 dark:text-red-400">Error de conexión al buscar datos.</span>';
+        } finally {
+            setTimeout(() => {
+                if (statusDiv && (statusDiv.querySelector('.text-red-600') || statusDiv.querySelector('.text-yellow-600') || statusDiv.querySelector('.text-gray-600'))) {
+                } else if (statusDiv) {
+                     statusDiv.innerHTML = '';
+                }
+            }, 7000);
+        }
+    }
+
+    function deleteTenant(id) {
+        try {
+            const modal = document.getElementById('deleteTenantModal');
+            if (!modal) { console.error("Modal 'deleteTenantModal' no encontrado"); return; }
+            const confirmBtn = modal.querySelector('.confirm-delete-button');
+            if (!confirmBtn) { console.error("Botón de confirmación no encontrado"); return; }
+
+            // Obtener el token CSRF de forma segura
+            const csrfTokenValue = document.querySelector('#createTenantForm input[name="csrf_token"]')?.value || 
+                                   document.querySelector('#editTenantForm input[name="csrf_token"]')?.value ||
+                                   document.querySelector('meta[name="csrf-token"]')?.content || '';
+            
+            if (!csrfTokenValue) {
+                console.error("Token CSRF no encontrado para deleteTenant.");
+                alert("Error de seguridad. No se puede eliminar.");
+                return;
+            }
+
+            confirmBtn.onclick = function() {
+                if (typeof confirmDeleteWithToken === 'function') {
+                    confirmDeleteWithToken(
+                        'deleteTenantModal',
+                        `{{ url_for('inquilinos_bp.delete_inquilino', id=0) }}`.replace('0', id),
+                        csrfTokenValue
+                    );
+                } else {
+                    console.error("Función global confirmDeleteWithToken no definida. Asegúrate que está en base.html");
+                    // Fallback (menos ideal, pero funcional)
+                    closeModal('deleteTenantModal');
+                    const form = document.createElement('form');
+                    form.method = 'POST';
+                    form.action = `{{ url_for('inquilinos_bp.delete_inquilino', id=0) }}`.replace('0', id);
+                    const csrfInput = document.createElement('input');
+                    csrfInput.type = 'hidden';
+                    csrfInput.name = 'csrf_token';
+                    csrfInput.value = csrfTokenValue;
+                    form.appendChild(csrfInput);
+                    document.body.appendChild(form);
+                    form.submit();
+                }
+            };
+            showModal('deleteTenantModal');
+        } catch(e) { console.error("Error en deleteTenant:", e); alert("Ocurrió un error al intentar eliminar.");}
+    }
+
+    // Búsqueda simple (frontend)
+    function searchTenants() {
+        try {
+            const searchTerm = document.getElementById('tenantSearch').value.toLowerCase();
+            const rows = document.querySelectorAll('#tenantsTable tr.tenant-row');
+            rows.forEach(row => {
+                const searchableText = Array.from(row.cells).map(cell => cell.textContent.toLowerCase()).join(' ');
+                row.style.display = searchableText.includes(searchTerm) ? '' : 'none';
+            });
+        } catch (e) { console.error("Error en searchTenants:", e); }
+    }
+
+    // --- NUEVA FUNCIÓN PARA BUSCAR INQUILINO EN FIREBIRD "GENERAL" Y AUTOCOMPLETAR ---
+    async function fetchExternalTenantData() {
+        const nifInput = document.getElementById('tenantNIF'); // ID del input del NIF en el modal de creación
+        const statusDiv = document.getElementById('externalTenantLookupStatus');
+        const submitButton = document.getElementById('createTenantSubmitButton'); // Botón de guardar del modal
+
+        if (!nifInput || !nifInput.value.trim()) {
+            if (statusDiv) {
+                statusDiv.innerHTML = '<span class="text-yellow-600 dark:text-yellow-400 flex items-center"><i class="fas fa-exclamation-triangle mr-1"></i>Introduce un NIF para buscar.</span>';
+                setTimeout(() => { if(statusDiv) statusDiv.innerHTML = ''; }, 3000);
+            }
+            nifInput.focus();
+            return;
+        }
+
+        const nif = nifInput.value.trim();
+        if (statusDiv) statusDiv.innerHTML = '<span class="text-blue-600 dark:text-blue-400 flex items-center"><i class="fas fa-spinner fa-spin mr-1"></i>Buscando en BD GENERAL...</span>';
+        if (submitButton) submitButton.disabled = true;
+
+        try {
+            const response = await fetch(`{{ url_for('external_db_api_bp.lookup_inquilino_from_general_db', nif_to_lookup='__NIF__') }}`.replace('__NIF__', encodeURIComponent(nif)));
+            const result = await response.json();
+
+            if (statusDiv) statusDiv.innerHTML = ''; 
+
+            if (response.ok) {
+                if (result.exists_in_app) {
+                    statusDiv.innerHTML = `<span class="text-yellow-600 dark:text-yellow-400 flex items-center"><i class="fas fa-exclamation-triangle mr-1"></i>${result.message}</span>`;
+                } else if (result.data) {
+                    statusDiv.innerHTML = '<span class="text-green-600 dark:text-green-400 flex items-center"><i class="fas fa-check-circle mr-1"></i>Datos encontrados y rellenados. Por favor, revisa y completa la información antes de guardar.</span>';
+                    
+                    // Mapeo de claves de result.data a IDs de input del formulario
+                    const fieldMapping = {
+                        'nombre': 'tenantName',
+                        'nif': 'tenantNIF', // Aunque ya lo tenemos, por si Firebird lo devuelve formateado diferente
+                        'direccion': 'tenantAddress',
+                        'codigo_postal': 'tenantCP',
+                        'ciudad': 'tenantCity',
+                        'telefono': 'tenantPhone'
+                        // email no se mapea porque se introduce manualmente
+                    };
+
+                    // Animar el llenado de campos
+                    let delay = 0;
+                    for (const [dataKey, inputId] of Object.entries(fieldMapping)) {
+                        const inputElement = document.getElementById(inputId);
+                        if (inputElement && result.data[dataKey] !== undefined && result.data[dataKey] !== null && result.data[dataKey] !== '') {
+                            setTimeout(() => {
+                                // Efecto de resaltado temporal
+                                inputElement.classList.add('ring-2', 'ring-green-400', 'border-green-400');
+                                inputElement.value = result.data[dataKey];
+                                // Disparar evento 'input' para que cualquier lógica JS de la UI reaccione
+                                inputElement.dispatchEvent(new Event('input', { bubbles: true }));
+                                
+                                // Quitar resaltado después de un momento
+                                setTimeout(() => {
+                                    inputElement.classList.remove('ring-2', 'ring-green-400', 'border-green-400');
+                                }, 1000);
+                            }, delay);
+                            delay += 200; // Stagger el llenado de campos
+                        }
+                    }
+                } else { 
+                    statusDiv.innerHTML = `<span class="text-gray-600 dark:text-gray-400 flex items-center"><i class="fas fa-info-circle mr-1"></i>${result.message || 'No se encontraron datos en la BD externa.'}</span>`;
+                }
+            } else { 
+                statusDiv.innerHTML = `<span class="text-red-600 dark:text-red-400 flex items-center"><i class="fas fa-times-circle mr-1"></i>${result.error || 'Error al buscar datos externos.'}</span>`;
+            }
+        } catch (error) {
+            console.error('Error en fetchExternalTenantData:', error);
+            if (statusDiv) statusDiv.innerHTML = '<span class="text-red-600 dark:text-red-400 flex items-center"><i class="fas fa-exclamation-triangle mr-1"></i>Error de conexión al buscar datos. Revisa la consola.</span>';
+        } finally {
+            if (submitButton) submitButton.disabled = false;
+             setTimeout(() => {
+                if (statusDiv && (statusDiv.querySelector('.text-red-600') || statusDiv.querySelector('.text-yellow-600') || statusDiv.querySelector('.text-gray-600'))) {
+                    // No limpiar si es un mensaje de error para que el usuario lo vea
+                } else if (statusDiv) {
+                     statusDiv.innerHTML = '';
+                }
+            }, 10000); // 10 segundos para errores o mensajes informativos
+        }
+    }
+	
+
+    function makeTenantRowsClickable() {
+        document.querySelectorAll('#tenantsTable tr.tenant-row').forEach(row => {
+            const newRow = row.cloneNode(true);
+            row.parentNode.replaceChild(newRow, row);
+
+            newRow.style.cursor = 'pointer';
+            newRow.addEventListener('click', function(event) {
+                if (event.target.closest('button, a')) {
+                    return;
+                }
+                const firstCellWithPotentialButton = this.querySelector('td:last-child button');
+                if (typeof editTenant === "function") {
+                    if (firstCellWithPotentialButton) {
+                       editTenant(firstCellWithPotentialButton); // Asume que editTenant espera el botón
+                    } else {
+                       // Si editTenant se adapta para recibir la fila: editTenant(this);
+                       console.warn("No se encontró botón para pasar a editTenant. Se pasará la fila.");
+                       // Para que esto funcione, editTenant debe ser: function editTenant(tenantRowElement)
+                       // y usar tenantRowElement.dataset directamente.
+                       // Por ahora, para minimizar cambios, intentará encontrar un botón.
+                       // Si no hay botones de acción en la fila, esta llamada fallará o necesitará
+                       // que editTenant(this) sea la forma de llamarlo.
+                       editTenant(this); // Prueba pasando la fila directamente
+                    }
+                }
+            });
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        // ... (tu JS existente de DOMContentLoaded) ...
+        makeTenantRowsClickable();
+    });
+	
+    // --- NUEVA FUNCIÓN PARA BUSCAR/ACTUALIZAR INQUILINO EN MODAL DE EDICIÓN ---
+	async function fetchExternalTenantDataForEdit() {
+		const nifInput = document.getElementById('editTenantNIF'); // Este NIF NO DEBE CAMBIARSE por esta acción
+		const statusDiv = document.getElementById('externalEditTenantLookupStatus');
+		
+		const nombreInput = document.getElementById('editTenantNombre');
+		const direccionInput = document.getElementById('editTenantDireccion');
+		const cpInput = document.getElementById('editTenantCP');
+		const ciudadInput = document.getElementById('editTenantPoblacion');
+		const telefonoInput = document.getElementById('editTenantTelefono');
+
+		if (!nifInput || !nifInput.value.trim()) {
+			if (statusDiv) statusDiv.innerHTML = '<span class="text-red-600 dark:text-red-400">Error: NIF del inquilino no disponible para la búsqueda.</span>';
+			return;
+		}
+		const nifParaBuscar = nifInput.value.trim(); // Usar el NIF actual del formulario de edición
+
+		if (statusDiv) statusDiv.innerHTML = '<span class="text-blue-600 dark:text-blue-400"><i class="fas fa-spinner fa-spin mr-1"></i>Actualizando datos desde BD GENERAL...</span>';
+
+		try {
+			const response = await fetch(`{{ url_for('external_db_api_bp.lookup_inquilino_from_general_db', nif_to_lookup='__NIF__') }}`.replace('__NIF__', encodeURIComponent(nifParaBuscar)));
+			const result = await response.json();
+
+			if (statusDiv) statusDiv.innerHTML = ''; 
+
+			if (response.ok) {
+				if (result.data) { // Si la API devolvió datos de DATOSFIS para el NIF
+					statusDiv.innerHTML = '<span class="text-green-600 dark:text-green-400"><i class="fas fa-check-circle mr-1"></i>Datos de BD GENERAL aplicados al formulario. Revisa y guarda los cambios.</span>';
+					
+					// Actualizar campos del formulario con los datos de DATOSFIS,
+					// manteniendo el valor actual si el dato de DATOSFIS es nulo/vacío.
+					if (nombreInput) nombreInput.value = result.data.nombre || nombreInput.value;
+					if (direccionInput) direccionInput.value = result.data.direccion || direccionInput.value;
+					if (cpInput) cpInput.value = result.data.codigo_postal || cpInput.value;
+					if (ciudadInput) ciudadInput.value = result.data.ciudad || ciudadInput.value;
+					if (telefonoInput) telefonoInput.value = result.data.telefono || telefonoInput.value;
+					// No se toca el NIF (ya es el buscado), email, estado, ni fechas.
+					
+					// Disparar evento input para que cualquier lógica JS de la UI reaccione
+					[nombreInput, direccionInput, cpInput, ciudadInput, telefonoInput].forEach(el => {
+						if(el) el.dispatchEvent(new Event('input', { bubbles: true }));
+					});
+
+				} else { 
+					// No se encontraron datos en DATOSFIS para este NIF. 
+					// El mensaje de la API (result.message) ya podría indicar si existe en la app.
+					statusDiv.innerHTML = `<span class="text-gray-600 dark:text-gray-400">${result.message || `No se encontraron datos en BD GENERAL para el NIF ${nifParaBuscar}. No se actualizaron campos.`}</span>`;
+				}
+			} else { 
+				statusDiv.innerHTML = `<span class="text-red-600 dark:text-red-400">${result.error || 'Error al buscar datos externos.'}</span>`;
+			}
+		} catch (error) {
+			console.error('Error en fetchExternalTenantDataForEdit:', error);
+			if (statusDiv) statusDiv.innerHTML = '<span class="text-red-600 dark:text-red-400">Error de conexión al buscar datos.</span>';
+		} finally {
+			setTimeout(() => {
+				if (statusDiv && !(statusDiv.querySelector('.text-red-600') || statusDiv.querySelector('.text-yellow-600'))) {
+					 statusDiv.innerHTML = '';
+				}
+			}, 7000);
+		}
+	}
+	
+    console.log('👥 Sistema de Inquilinos cargado correctamente');
+</script>
+{% endblock %}

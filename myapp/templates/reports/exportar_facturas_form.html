@@ -1,0 +1,471 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ title }}{% endblock %}
+{% block header_title %}{{ title }}{% endblock %}
+
+{% block content %}
+
+<!-- Header de Sección con estilo consistente -->
+<div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+    <h2 class="text-2xl font-semibold text-gray-800 dark:text-gray-100 mb-4 md:mb-0">📊 Exportar Facturas</h2>
+    <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+        <div class="text-sm text-gray-600 dark:text-gray-400 flex items-center">
+            <i class="fas fa-info-circle mr-2"></i>
+            <span>Exportación a CSV con delimitador punto y coma</span>
+        </div>
+    </div>
+</div>
+
+
+
+<!-- Tarjeta Principal de Exportación -->
+<div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+    <!-- Header de la tarjeta -->
+    <div class="bg-gradient-to-r from-green-600 to-emerald-600 px-6 py-4">
+        <h3 class="text-xl font-semibold text-white flex items-center">
+            <i class="fas fa-download mr-3"></i>
+            Configurar Exportación de Facturas
+        </h3>
+        <p class="text-green-100 text-sm mt-1">Selecciona los parámetros para generar tu archivo CSV</p>
+    </div>
+
+    <!-- Contenido de la tarjeta -->
+    <div class="p-6">
+        <!-- Información previa -->
+        <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
+            <div class="flex items-start">
+                <div class="flex-shrink-0">
+                    <i class="fas fa-info-circle text-blue-600 dark:text-blue-400 mt-1"></i>
+                </div>
+                <div class="ml-3">
+                    <h4 class="text-sm font-medium text-blue-800 dark:text-blue-200">Información sobre la exportación</h4>
+                    <div class="mt-2 text-sm text-blue-700 dark:text-blue-300">
+                        <ul class="list-disc list-inside space-y-1">
+                            <li>El archivo CSV incluirá todas las facturas del propietario seleccionado en el rango de fechas</li>
+                            <li>Los datos se exportarán con separador punto y coma (;) para compatibilidad con Excel</li>
+                            <li>La codificación UTF-8 asegura caracteres especiales correctos</li>
+                            <li>Campos incluidos: Fecha, Número, Cliente, Importe, Estado, etc.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if not propietarios %}
+        <!-- Estado sin propietarios -->
+        <div class="text-center py-12">
+            <div class="mx-auto h-24 w-24 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center mb-4">
+                <i class="fas fa-user-slash text-gray-400 text-3xl"></i>
+            </div>
+            <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">No hay propietarios disponibles</h3>
+            <p class="text-gray-500 dark:text-gray-400 mb-6">
+                {% if current_user.role == 'admin' %}
+                    No hay propietarios registrados en el sistema.
+                {% else %}
+                    No tienes propietarios asignados para exportar.
+                {% endif %}
+            </p>
+            <a href="{{ url_for('propietarios_bp.listar_propietarios') }}" 
+               class="inline-flex items-center px-4 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800 transition-all">
+                <i class="fas fa-plus mr-2"></i>
+                Gestionar Propietarios
+            </a>
+        </div>
+        {% else %}
+        <!-- Formulario de exportación -->
+        <form action="{{ url_for('reports_bp.exportar_facturas_csv') }}" method="POST" id="exportForm" class="space-y-6">
+            {{ csrf_form.csrf_token }}
+            
+            <!-- Selector de Propietario -->
+            <div class="space-y-2">
+                <label for="propietario_id" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Propietario <span class="text-red-500">*</span>
+                </label>
+                <div class="relative">
+                    <select id="propietario_id" name="propietario_id" required 
+                            class="form-input w-full pl-10 pr-4 py-3 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all">
+                        <option value="">-- Selecciona o escribe para buscar --</option>
+                        {% for p in propietarios %}
+                            <option value="{{ p.id }}">{{ p.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                    <i class="fas fa-user-tie absolute left-3 top-3.5 text-gray-400"></i>
+                    <!-- Flecha dropdown personalizada -->
+                    <i class="fas fa-chevron-down dropdown-arrow absolute right-3 top-3.5 text-gray-400 pointer-events-none"></i>
+                </div>
+                <p class="text-xs text-gray-500 dark:text-gray-400">Busca escribiendo el nombre del propietario</p>
+            </div>
+
+            <!-- Rango de Fechas -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="space-y-2">
+                    <label for="fecha_desde" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Fecha Desde <span class="text-red-500">*</span>
+                    </label>
+                    <div class="relative">
+                        <input type="date" id="fecha_desde" name="fecha_desde" required 
+                               class="form-input w-full pl-10 pr-4 py-3 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all">
+                        <i class="fas fa-calendar-alt absolute left-3 top-3.5 text-gray-400"></i>
+                    </div>
+                </div>
+                
+                <div class="space-y-2">
+                    <label for="fecha_hasta" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Fecha Hasta <span class="text-red-500">*</span>
+                    </label>
+                    <div class="relative">
+                        <input type="date" id="fecha_hasta" name="fecha_hasta" required 
+                               class="form-input w-full pl-10 pr-4 py-3 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all">
+                        <i class="fas fa-calendar-alt absolute left-3 top-3.5 text-gray-400"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Botones de Fecha Rápida -->
+            <div class="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4">
+                <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Rangos de fecha rápidos:</h4>
+                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
+                    <button type="button" onclick="setDateRange('1T')" 
+                            class="px-3 py-2 text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                        1T
+                    </button>
+                    <button type="button" onclick="setDateRange('2T')" 
+                            class="px-3 py-2 text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                        2T
+                    </button>
+                    <button type="button" onclick="setDateRange('3T')" 
+                            class="px-3 py-2 text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                        3T
+                    </button>
+                    <button type="button" onclick="setDateRange('4T')" 
+                            class="px-3 py-2 text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                        4T
+                    </button>
+                    <button type="button" onclick="setDateRange('thisMonth')" 
+                            class="px-3 py-2 text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                        Este mes
+                    </button>
+                    <button type="button" onclick="setDateRange('thisYear')" 
+                            class="px-3 py-2 text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                        Este año
+                    </button>
+                </div>
+            </div>
+
+            <!-- Estado del formulario -->
+            <div id="formStatus" class="min-h-[1.5rem]"></div>
+        </form>
+        {% endif %}
+    </div>
+
+    {% if propietarios %}
+    <!-- Footer de la tarjeta -->
+    <div class="bg-gray-50 dark:bg-gray-900/50 px-6 py-4 border-t border-gray-200 dark:border-gray-700">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div class="text-xs text-gray-500 dark:text-gray-400 flex items-center">
+                <i class="fas fa-shield-alt mr-1"></i>
+                Exportación segura con validación de datos
+            </div>
+            <button type="submit" form="exportForm" id="exportButton"
+                    class="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-6 py-3 rounded-lg flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-green-500 transition-all shadow hover:shadow-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+                <i id="exportButtonIcon" class="fas fa-download mr-2"></i>
+                <span id="exportButtonText">Exportar a CSV</span>
+            </button>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Sección de Ayuda -->
+<div class="mt-8 bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+    <div class="bg-gray-50 dark:bg-gray-900/50 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+        <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 flex items-center">
+            <i class="fas fa-question-circle text-blue-600 dark:text-blue-400 mr-2"></i>
+            Ayuda y Preguntas Frecuentes
+        </h3>
+    </div>
+    <div class="p-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+                <h4 class="font-medium text-gray-900 dark:text-white mb-2">¿Qué datos se incluyen en el CSV?</h4>
+                <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                    El archivo incluye fecha de facturación, número de factura, datos del inquilino, 
+                    importes, estado de pago y otra información relevante.
+                </p>
+                
+                <h4 class="font-medium text-gray-900 dark:text-white mb-2">¿Cómo abrir el archivo en Excel?</h4>
+                <p class="text-sm text-gray-600 dark:text-gray-400">
+                    El archivo está optimizado para Excel. Abre Excel y usa "Abrir archivo" 
+                    para importar correctamente los datos con formato español.
+                </p>
+            </div>
+            <div>
+                <h4 class="font-medium text-gray-900 dark:text-white mb-2">¿Hay límite de registros?</h4>
+                <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                    No hay límite en el número de facturas a exportar. El sistema 
+                    procesará todas las facturas del rango seleccionado.
+                </p>
+                
+                <h4 class="font-medium text-gray-900 dark:text-white mb-2">¿Los datos están actualizados?</h4>
+                <p class="text-sm text-gray-600 dark:text-gray-400">
+                    Sí, la exportación incluye todos los datos más recientes 
+                    de facturas almacenados en el sistema.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Configuración de Tom Select
+    document.addEventListener('DOMContentLoaded', function() {
+        const propietarioSelect = document.getElementById('propietario_id');
+        
+        // Inicializar Tom Select si está disponible y hay un select
+        if (propietarioSelect && typeof TomSelect !== 'undefined') {
+            new TomSelect(propietarioSelect, {
+                create: false,
+                sortField: {
+                    field: "text",
+                    direction: "asc"
+                },
+                placeholder: '-- Selecciona o escribe para buscar --',
+                controlInput: '<input>',
+                searchField: ['text'],
+                maxOptions: 50
+            });
+        } else if (propietarioSelect && typeof TomSelect === 'undefined') {
+            console.warn('Tom Select JS no está cargado. El selector de propietario no será buscable.');
+        }
+
+        // Configurar fechas por defecto (este mes)
+        setDateRange('thisMonth');
+
+        // Configurar formulario de exportación
+        setupExportForm();
+    });
+
+    // Función para establecer rangos de fecha rápidos
+    function setDateRange(range) {
+        const fechaDesdeInput = document.getElementById('fecha_desde');
+        const fechaHastaInput = document.getElementById('fecha_hasta');
+        
+        if (!fechaDesdeInput || !fechaHastaInput) return;
+
+        const today = new Date();
+        const currentYear = today.getFullYear();
+        let startDate, endDate;
+
+        switch(range) {
+            case '1T': // Primer trimestre: 01/01 a 31/03
+                startDate = new Date(currentYear, 0, 1); // 1 enero
+                endDate = new Date(currentYear, 2, 31); // 31 marzo
+                break;
+            case '2T': // Segundo trimestre: 01/04 a 30/06
+                startDate = new Date(currentYear, 3, 1); // 1 abril
+                endDate = new Date(currentYear, 5, 30); // 30 junio
+                break;
+            case '3T': // Tercer trimestre: 01/07 a 30/09
+                startDate = new Date(currentYear, 6, 1); // 1 julio
+                endDate = new Date(currentYear, 8, 30); // 30 septiembre
+                break;
+            case '4T': // Cuarto trimestre: 01/10 a 31/12
+                startDate = new Date(currentYear, 9, 1); // 1 octubre
+                endDate = new Date(currentYear, 11, 31); // 31 diciembre
+                break;
+            case 'thisMonth': // Del 01 del mes actual al último día del mes actual
+                startDate = new Date(currentYear, today.getMonth(), 1);
+                endDate = new Date(currentYear, today.getMonth() + 1, 0); // Último día del mes
+                break;
+            case 'thisYear': // Del 01/01 al 31/12 del año actual
+                startDate = new Date(currentYear, 0, 1); // 1 enero
+                endDate = new Date(currentYear, 11, 31); // 31 diciembre
+                break;
+            default:
+                return;
+        }
+
+        // Formatear fechas manualmente para evitar problemas de zona horaria
+        const formatDate = (date) => {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        };
+
+        fechaDesdeInput.value = formatDate(startDate);
+        fechaHastaInput.value = formatDate(endDate);
+
+        // Mostrar feedback visual
+        showFormStatus('Rango de fechas actualizado', 'success');
+    }
+
+    // Configurar el formulario de exportación
+    function setupExportForm() {
+        const exportForm = document.getElementById('exportForm');
+        const exportButton = document.getElementById('exportButton');
+        const exportButtonIcon = document.getElementById('exportButtonIcon');
+        const exportButtonText = document.getElementById('exportButtonText');
+
+        if (!exportForm || !exportButton) return;
+
+        const originalButtonText = exportButtonText.textContent;
+        const originalIconClass = exportButtonIcon.className;
+
+        exportForm.addEventListener('submit', function(e) {
+            // Validar formulario antes del envío
+            if (!validateForm()) {
+                e.preventDefault();
+                return false;
+            }
+
+            // Cambiar estado del botón
+            exportButton.disabled = true;
+            exportButtonIcon.className = 'fas fa-spinner fa-spin mr-2';
+            exportButtonText.textContent = 'Exportando...';
+
+            // Mostrar estado de procesamiento
+            showFormStatus('Generando archivo CSV, por favor espera...', 'info');
+
+            // Restaurar botón después de un tiempo (en caso de error)
+            setTimeout(() => {
+                exportButton.disabled = false;
+                exportButtonIcon.className = originalIconClass;
+                exportButtonText.textContent = originalButtonText;
+            }, 10000); // 10 segundos timeout
+        });
+
+        // Validación en tiempo real
+        const inputs = exportForm.querySelectorAll('input[required], select[required]');
+        inputs.forEach(input => {
+            input.addEventListener('change', validateForm);
+            input.addEventListener('blur', validateForm);
+        });
+    }
+
+    // Validar formulario
+    function validateForm() {
+        const propietarioSelect = document.getElementById('propietario_id');
+        const fechaDesde = document.getElementById('fecha_desde');
+        const fechaHasta = document.getElementById('fecha_hasta');
+
+        // Limpiar estados de error previos
+        clearFieldErrors();
+
+        let isValid = true;
+        let errors = [];
+
+        // Validar propietario
+        if (!propietarioSelect.value) {
+            showFieldError(propietarioSelect, 'Debes seleccionar un propietario');
+            errors.push('Propietario requerido');
+            isValid = false;
+        }
+
+        // Validar fechas
+        if (!fechaDesde.value) {
+            showFieldError(fechaDesde, 'La fecha desde es requerida');
+            errors.push('Fecha desde requerida');
+            isValid = false;
+        }
+
+        if (!fechaHasta.value) {
+            showFieldError(fechaHasta, 'La fecha hasta es requerida');
+            errors.push('Fecha hasta requerida');
+            isValid = false;
+        }
+
+        // Validar rango de fechas
+        if (fechaDesde.value && fechaHasta.value) {
+            const desde = new Date(fechaDesde.value);
+            const hasta = new Date(fechaHasta.value);
+            
+            if (desde > hasta) {
+                showFieldError(fechaHasta, 'La fecha hasta debe ser posterior a la fecha desde');
+                errors.push('Rango de fechas inválido');
+                isValid = false;
+            }
+
+            // Validar que no sea un rango muy amplio (más de 5 años)
+            const diffYears = (hasta - desde) / (1000 * 60 * 60 * 24 * 365);
+            if (diffYears > 5) {
+                showFieldError(fechaHasta, 'El rango no puede ser mayor a 5 años');
+                errors.push('Rango demasiado amplio');
+                isValid = false;
+            }
+        }
+
+        // Mostrar estado del formulario
+        if (errors.length > 0) {
+            showFormStatus(`Errores: ${errors.join(', ')}`, 'error');
+        } else if (propietarioSelect.value && fechaDesde.value && fechaHasta.value) {
+            showFormStatus('Formulario válido, listo para exportar', 'success');
+        } else {
+            clearFormStatus();
+        }
+
+        return isValid;
+    }
+
+    // Mostrar error en campo específico
+    function showFieldError(field, message) {
+        field.classList.add('border-red-500', 'dark:border-red-600');
+        
+        // Añadir mensaje de error si no existe
+        let errorMsg = field.parentNode.querySelector('.field-error');
+        if (!errorMsg) {
+            errorMsg = document.createElement('p');
+            errorMsg.className = 'field-error text-red-500 text-xs mt-1';
+            field.parentNode.appendChild(errorMsg);
+        }
+        errorMsg.textContent = message;
+    }
+
+    // Limpiar errores de campos
+    function clearFieldErrors() {
+        const fields = document.querySelectorAll('.border-red-500');
+        fields.forEach(field => {
+            field.classList.remove('border-red-500', 'dark:border-red-600');
+        });
+
+        const errorMsgs = document.querySelectorAll('.field-error');
+        errorMsgs.forEach(msg => msg.remove());
+    }
+
+    // Mostrar estado del formulario
+    function showFormStatus(message, type) {
+        const statusDiv = document.getElementById('formStatus');
+        if (!statusDiv) return;
+
+        const colors = {
+            success: 'text-green-600 dark:text-green-400',
+            error: 'text-red-600 dark:text-red-400',
+            info: 'text-blue-600 dark:text-blue-400',
+            warning: 'text-yellow-600 dark:text-yellow-400'
+        };
+
+        const icons = {
+            success: 'fa-check-circle',
+            error: 'fa-times-circle',
+            info: 'fa-info-circle',
+            warning: 'fa-exclamation-triangle'
+        };
+
+        statusDiv.innerHTML = `
+            <div class="flex items-center text-sm ${colors[type] || colors.info}">
+                <i class="fas ${icons[type] || icons.info} mr-2"></i>
+                ${message}
+            </div>
+        `;
+    }
+
+    // Limpiar estado del formulario
+    function clearFormStatus() {
+        const statusDiv = document.getElementById('formStatus');
+        if (statusDiv) statusDiv.innerHTML = '';
+    }
+</script>
+{% endblock %}

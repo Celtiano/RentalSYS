@@ -1,0 +1,79 @@
+{# myapp/templates/login.html #}
+{% extends "base.html" %} {# O tu layout base si es diferente #}
+
+{% block title %}{{ title }}{% endblock %}
+
+{# Ocultar header/footer estándar en la página de login si quieres #}
+{% block header %}<!-- Header oculto en login -->{% endblock %}
+{% block sidebar %}<!-- Sidebar oculto en login -->{% endblock %}
+{% block footer %}<!-- Footer oculto en login -->{% endblock %}
+
+{% block content %}
+<div class="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-md w-full space-y-8 bg-white dark:bg-gray-800 p-8 sm:p-10 rounded-2xl shadow-xl">
+        <div>
+            {# --- MODIFICACIÓN AQUÍ --- #}
+            <img class="mx-auto h-24 w-auto mb-6 sm:h-32" src="{{ url_for('static', filename='images/logo_rentalsys_1024.png') }}" alt="RentalSys Logo">
+            <h2 class="text-center text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white">
+                Iniciar Sesión
+            </h2>
+            <p class="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
+                Bienvenido a RentalSys
+            </p>
+            {# --- FIN MODIFICACIÓN --- #}
+        </div>
+
+<!--         {# Mensajes Flash (si los tenías o quieres añadirlos) #}
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="my-4 space-y-2">
+                {% for category, message in messages %}
+                    {% set cat_map={'danger':'red','success':'green','warning':'yellow','info':'blue'} %}
+                    {% set c=cat_map.get(category, 'blue') %}
+                    <div class="bg-{{c}}-100 dark:bg-{{c}}-900/30 border-l-4 border-{{c}}-500 text-{{c}}-700 dark:text-{{c}}-300 p-3 rounded-md text-sm" role="alert">
+                        <p>{{ message|safe }}</p>
+                    </div>
+                {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %} -->
+
+        <form class="mt-8 space-y-6" action="{{ url_for('auth_bp.login') }}{% if request.args.next %}?next={{ request.args.next }}{% endif %}" method="POST" novalidate>
+            {{ form.csrf_token }}
+            {# ... el resto de tu formulario de login SIN CAMBIOS ... #}
+            <input type="hidden" name="remember" value="true">
+            <div class="rounded-md shadow-sm -space-y-px">
+                <div>
+                    {{ form.username.label(class="sr-only") }}
+                    {{ form.username(id="username", class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white bg-white dark:bg-gray-700 rounded-t-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm", placeholder="Nombre de Usuario", required=True) }}
+                    {% if form.username.errors %}
+                        <p class="text-red-500 text-xs italic mt-1">{{ form.username.errors[0] }}</p>
+                    {% endif %}
+                </div>
+                <div>
+                    {{ form.password.label(class="sr-only") }}
+                    {{ form.password(id="password", type="password", autocomplete="current-password", class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white bg-white dark:bg-gray-700 rounded-b-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm", placeholder="Contraseña", required=True) }}
+                    {% if form.password.errors %}
+                        <p class="text-red-500 text-xs italic mt-1">{{ form.password.errors[0] }}</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="flex items-center justify-between">
+                <div class="flex items-center">
+                    {{ form.remember_me(id="remember-me", class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700") }}
+                    {{ form.remember_me.label(for="remember-me", class="ml-2 block text-sm text-gray-900 dark:text-gray-300") }}
+                </div>
+            </div>
+
+            <div>
+                {{ form.submit(class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-800") }}
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{# Limpiar scripts/styles base si no se necesitan en login #}
+{% block scripts %}{% endblock %}
+{% block styles %}{% endblock %}

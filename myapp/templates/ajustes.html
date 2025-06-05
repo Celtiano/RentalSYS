@@ -1,0 +1,424 @@
+{% extends 'base.html' %}
+
+{% block title %}Ajustes - RentalSys{% endblock %}
+{% block header_title %}Ajustes del Sistema{% endblock %}
+
+{% block content %}
+<form id="settingsForm" action="{{ url_for('main_bp.ajustes_view') }}" method="POST" enctype="multipart/form-data" novalidate>
+	{{ csrf_form.csrf_token }}
+    <!-- Tabs Navigation -->
+    <div class="border-b border-gray-200 dark:border-gray-700 mb-6">
+        <nav class="-mb-px flex space-x-8 overflow-x-auto" aria-label="Tabs">
+            <button type="button" id="generalTab" onclick="changeTab('general')" class="tab-button tab-active whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-blue-600 border-blue-600 dark:text-blue-400 dark:border-blue-400">
+                <i class="fas fa-cog mr-2"></i> General
+            </button>
+            <button type="button" id="companyTab" onclick="changeTab('company')" class="tab-button whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300 border-transparent dark:text-gray-400 dark:hover:text-gray-300 dark:hover:border-gray-600">
+                <i class="fas fa-building mr-2"></i> Empresa
+            </button>
+            <button type="button" id="notificationsTab" onclick="changeTab('notifications')" class="tab-button whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300 border-transparent dark:text-gray-400 dark:hover:text-gray-300 dark:hover:border-gray-600">
+                <i class="fas fa-bell mr-2"></i> Notificaciones
+            </button>
+            <button type="button" id="emailTab" onclick="changeTab('email')" class="tab-button whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300 border-transparent dark:text-gray-400 dark:hover:text-gray-300 dark:hover:border-gray-600">
+                <i class="fas fa-envelope mr-2"></i> Correo
+            </button>	
+            <button type="button" id="securityTab" onclick="changeTab('security')" class="tab-button whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300 border-transparent dark:text-gray-400 dark:hover:text-gray-300 dark:hover:border-gray-600">
+                <i class="fas fa-shield-alt mr-2"></i> Seguridad
+            </button>
+            <button type="button" id="advancedTab" onclick="changeTab('advanced')" class="tab-button whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300 border-transparent dark:text-gray-400 dark:hover:text-gray-300 dark:hover:border-gray-600">
+                <i class="fas fa-sliders-h mr-2"></i> Avanzado
+            </button>
+        </nav>
+    </div>
+
+    <!-- =================== TAB GENERAL =================== -->
+    <div id="generalTabContent" class="settings-tab-content">
+        <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-6 mb-6">
+            <h2 class="text-lg font-medium text-gray-800 dark:text-gray-100 mb-4">Preferencias Generales</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label for="language" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Idioma</label>
+                    <select id="language" name="language" class="form-input w-full dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200">
+                        <option value="es" {% if settings.language == 'es' %}selected{% endif %}>Español</option>
+                        <option value="en" {% if settings.language == 'en' %}selected{% endif %}>Inglés</option>
+                        <option value="fr" {% if settings.language == 'fr' %}selected{% endif %}>Francés</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="timezone" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Zona Horaria</label>
+                    <select id="timezone" name="timezone" class="form-input w-full dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200">
+                        <option value="Europe/Madrid" {% if settings.timezone == 'Europe/Madrid' %}selected{% endif %}>Madrid (GMT+1/2)</option>
+                        <option value="Europe/London" {% if settings.timezone == 'Europe/London' %}selected{% endif %}>Londres (GMT+0/1)</option>
+                        <option value="UTC" {% if settings.timezone == 'UTC' %}selected{% endif %}>UTC</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="date_format" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Formato de Fecha</label>
+                    <select id="date_format" name="date_format" class="form-input w-full dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200">
+                        <option value="%d/%m/%Y" {% if settings.date_format == '%d/%m/%Y' %}selected{% endif %}>DD/MM/AAAA</option>
+                        <option value="%m/%d/%Y" {% if settings.date_format == '%m/%d/%Y' %}selected{% endif %}>MM/DD/AAAA</option>
+                        <option value="%Y-%m-%d" {% if settings.date_format == '%Y-%m-%d' %}selected{% endif %}>AAAA-MM-DD</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="currency" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Moneda</label>
+                    <select id="currency" name="currency" class="form-input w-full dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200">
+                        <option value="EUR" {% if settings.currency == 'EUR' %}selected{% endif %}>Euro (€)</option>
+                        <option value="USD" {% if settings.currency == 'USD' %}selected{% endif %}>Dólar ($)</option>
+                        <option value="GBP" {% if settings.currency == 'GBP' %}selected{% endif %}>Libra (£)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="mt-6 space-y-4">
+                <div class="flex items-center justify-between">
+                    <div><label for="darkModeToggle" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Modo Oscuro</label><p class="text-xs text-gray-500 dark:text-gray-400">Activa el tema oscuro</p></div>
+                    <label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="darkModeToggle" name="darkModeToggle" class="sr-only peer" {% if settings.dark_mode %}checked{% endif %} onchange="toggleDarkMode()"><div class="toggle-bg"></div></label>
+                </div>
+                <div class="flex items-center justify-between">
+                    <div><label for="show_tutorial" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Mostrar tutorial</label></div>
+                    <label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="show_tutorial" name="show_tutorial" class="sr-only peer" {% if settings.show_tutorial %}checked{% endif %}><div class="toggle-bg"></div></label>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-6 mb-6">
+            <h2 class="text-lg font-medium text-gray-800 dark:text-gray-100 mb-4">Preferencias de Visualización</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label for="default_view" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Vista por defecto</label>
+                    <select id="default_view" name="default_view" class="form-input w-full dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200">
+                        <option value="table" {% if settings.default_view == 'table' %}selected{% endif %}>Tabla</option>
+                        <option value="card" {% if settings.default_view == 'card' %}selected{% endif %}>Tarjetas</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="items_per_page" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Elementos/página</label>
+                    <select id="items_per_page" name="items_per_page" class="form-input w-full dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200">
+                        <option value="10" {% if settings.items_per_page == 10 %}selected{% endif %}>10</option>
+                        <option value="25" {% if settings.items_per_page == 25 %}selected{% endif %}>25</option>
+                        <option value="50" {% if settings.items_per_page == 50 %}selected{% endif %}>50</option>
+                        <option value="100" {% if settings.items_per_page == 100 %}selected{% endif %}>100</option>
+                    </select>
+                </div>
+            </div>
+            <div class="mt-6 space-y-4">
+                <div class="flex items-center justify-between">
+                    <div><label for="show_stats" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Mostrar stats</label></div>
+                    <label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="show_stats" name="show_stats" class="sr-only peer" {% if settings.show_stats %}checked{% endif %}><div class="toggle-bg"></div></label>
+                </div>
+                <div class="flex items-center justify-between">
+                    <div><label for="show_alerts" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Mostrar alertas</label></div>
+                    <label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="show_alerts" name="show_alerts" class="sr-only peer" {% if settings.show_alerts %}checked{% endif %}><div class="toggle-bg"></div></label>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- =================== TAB COMPANY =================== -->
+    <div id="companyTabContent" class="settings-tab-content hidden">
+        <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-6 mb-6">
+            <h2 class="text-lg font-medium text-gray-800 dark:text-gray-100 mb-4">Información de la Empresa</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div><label for="company_name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nombre Empresa</label><input type="text" id="company_name" name="company_name" value="{{ settings.company_name or '' }}" class="form-input w-full dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"></div>
+                <div><label for="company_nif" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">NIF/CIF</label><input type="text" id="company_nif" name="company_nif" value="{{ settings.company_nif or '' }}" class="form-input w-full dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"></div>
+                <div class="md:col-span-2"><label for="company_address" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Dirección</label><input type="text" id="company_address" name="company_address" value="{{ settings.company_address or '' }}" class="form-input w-full dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"></div>
+                <div><label for="company_city" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Ciudad</label><input type="text" id="company_city" name="company_city" value="{{ settings.company_city or '' }}" class="form-input w-full dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"></div>
+                <div><label for="company_zip" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Código Postal</label><input type="text" id="company_zip" name="company_zip" value="{{ settings.company_zip or '' }}" class="form-input w-full dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"></div>
+                <div><label for="company_country" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">País</label><select id="company_country" name="company_country" class="form-input w-full dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"><option value="España" {% if settings.company_country == 'España' %}selected{% endif %}>España</option><option value="Portugal" {% if settings.company_country == 'Portugal' %}selected{% endif %}>Portugal</option></select></div>
+                <div><label for="company_phone" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Teléfono</label><input type="tel" id="company_phone" name="company_phone" value="{{ settings.company_phone or '' }}" class="form-input w-full dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"></div>
+                <div><label for="company_email" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label><input type="email" id="company_email" name="company_email" value="{{ settings.company_email or '' }}" class="form-input w-full dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"></div>
+                <div class="md:col-span-2"><label for="company_website" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Página Web</label><input type="url" id="company_website" name="company_website" value="{{ settings.company_website or '' }}" placeholder="https://" class="form-input w-full dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"></div>
+            </div>
+        </div>
+        <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
+            <h2 class="text-lg font-medium text-gray-800 dark:text-gray-100 mb-4">Logo de la Empresa</h2>
+            <div class="flex items-center">
+                <div class="mr-6"><div class="w-32 h-32 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center overflow-hidden border dark:border-gray-600"> {% if settings.company_logo_filename %}<img id="currentLogo" src="{{ url_for('main_bp.serve_logo', filename=settings.company_logo_filename) }}?t={{ now().timestamp() }}" alt="Logo Actual" class="w-full h-full object-cover"> {% else %}<img id="currentLogo" src="https://via.placeholder.com/128/E0E7FF/4F46E5?text=Logo" alt="Logo Placeholder" class="w-full h-full object-cover">{% endif %}</div></div>
+                <div><label for="companyLogo" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Cambiar Logo</label><input type="file" name="company_logo" id="companyLogo" accept="image/png, image/jpeg, image/gif, image/svg+xml" class="block w-full text-sm text-gray-500 dark:text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-blue-900/50 dark:file:text-blue-300 dark:hover:file:bg-blue-800/50"/><p class="text-xs text-gray-500 dark:text-gray-400 mt-2">JPG, PNG, GIF, SVG. Máx 2MB.</p></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- =================== TAB NOTIFICATIONS ============ -->
+    <div id="notificationsTabContent" class="settings-tab-content hidden">
+        <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
+            <h2 class="text-lg font-medium text-gray-800 dark:text-gray-100 mb-6">Configuración de Notificaciones</h2>
+            <div class="space-y-6">
+                <div>
+                    <h3 class="text-md font-medium text-gray-700 dark:text-gray-300 mb-3">Notificaciones por Email</h3>
+                    <div class="space-y-4">
+                        <div class="flex items-center justify-between"><div><label for="email_new_contract" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Nuevos contratos</label></div><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="email_new_contract" name="email_new_contract" {% if settings.email_new_contract %}checked{% endif %} class="sr-only peer"><div class="toggle-bg"></div></label></div>
+                        <div class="flex items-center justify-between"><div><label for="email_payment_received" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Pagos recibidos</label></div><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="email_payment_received" name="email_payment_received" {% if settings.email_payment_received %}checked{% endif %} class="sr-only peer"><div class="toggle-bg"></div></label></div>
+                        <div class="flex items-center justify-between"><div><label for="email_payment_overdue" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Pagos atrasados</label></div><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="email_payment_overdue" name="email_payment_overdue" {% if settings.email_payment_overdue %}checked{% endif %} class="sr-only peer"><div class="toggle-bg"></div></label></div>
+                        <div class="flex items-center justify-between"><div><label for="email_maintenance" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Mantenimientos</label></div><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="email_maintenance" name="email_maintenance" {% if settings.email_maintenance %}checked{% endif %} class="sr-only peer"><div class="toggle-bg"></div></label></div>
+                    </div>
+                </div>
+                <div class="border-t border-gray-200 dark:border-gray-700 pt-6">
+                    <h3 class="text-md font-medium text-gray-700 dark:text-gray-300 mb-3">Notificaciones en Sistema</h3>
+                    <div class="space-y-4">
+                        <div class="flex items-center justify-between"><div><label for="system_reminders" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Recordatorios</label></div><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="system_reminders" name="system_reminders" {% if settings.system_reminders %}checked{% endif %} class="sr-only peer"><div class="toggle-bg"></div></label></div>
+                        <div class="flex items-center justify-between"><div><label for="system_alerts" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Alertas</label></div><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="system_alerts" name="system_alerts" {% if settings.system_alerts %}checked{% endif %} class="sr-only peer"><div class="toggle-bg"></div></label></div>
+                    </div>
+                </div>
+                <div class="border-t border-gray-200 dark:border-gray-700 pt-6">
+                    <h3 class="text-md font-medium text-gray-700 dark:text-gray-300 mb-3">Email Saliente</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div><label for="sender_email" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Email Remitente</label><input type="email" id="sender_email" name="sender_email" value="{{ settings.sender_email or '' }}" class="form-input w-full dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"></div>
+                        <div><label for="sender_name" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Nombre Remitente</label><input type="text" id="sender_name" name="sender_name" value="{{ settings.sender_name or '' }}" class="form-input w-full dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- =================== TAB SECURITY =================== -->
+    <div id="securityTabContent" class="settings-tab-content hidden">
+        <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-6 mb-6">
+            <h2 class="text-lg font-medium text-gray-800 dark:text-gray-100 mb-6">Seguridad y Acceso</h2>
+            <div class="space-y-6">
+                <div>
+                    <h3 class="text-md font-medium text-gray-700 dark:text-gray-300 mb-3">Autenticación</h3>
+                    <div class="space-y-4">
+                        <div class="flex items-center justify-between"><div><label for="enable_2fa" class="block text-sm font-medium text-gray-500 dark:text-gray-400 italic">Autenticación 2FA</label></div><label class="relative inline-flex items-center cursor-not-allowed"><input type="checkbox" id="enable_2fa" name="enable_2fa" disabled class="sr-only peer"><div class="toggle-bg opacity-50"></div></label></div>
+                        <div class="flex items-center justify-between"><div><label for="force_password_change" class="block text-sm font-medium text-gray-500 dark:text-gray-400 italic">Requerir cambio pass</label></div><label class="relative inline-flex items-center cursor-not-allowed"><input type="checkbox" id="force_password_change" name="force_password_change" disabled class="sr-only peer"><div class="toggle-bg opacity-50"></div></label></div>
+                        <div class="flex items-center justify-between"><div><label for="log_activity" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Registro actividad</label></div><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="log_activity" name="log_activity" {% if settings.log_activity %}checked{% endif %} class="sr-only peer"><div class="toggle-bg"></div></label></div>
+                    </div>
+                </div>
+
+                <!-- Cambiar Contraseña (sin <form>) -->
+                <div class="border-t border-gray-200 dark:border-gray-700 pt-6">
+                    <h3 class="text-md font-medium text-gray-700 dark:text-gray-300 mb-3">Cambiar Contraseña</h3>
+                    <div id="passwordChangeSection">
+                        <div class="grid grid-cols-1 gap-6">
+                            <div><label for="current_password" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Contraseña actual</label><input type="password" id="current_password" name="current_password" class="form-input w-full dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"></div>
+                            <div><label for="new_password" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Nueva contraseña</label><input type="password" id="new_password" name="new_password" class="form-input w-full dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"><p class="text-xs text-gray-500 dark:text-gray-400">Mínimo 8 caracteres</p></div>
+                            <div><label for="confirm_password" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Confirmar contraseña</label><input type="password" id="confirm_password" name="confirm_password" class="form-input w-full dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"></div>
+                        </div>
+                        <div class="mt-4 flex justify-end"><button type="button" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-800 disabled:opacity-50" disabled title="Funcionalidad no implementada">Cambiar</button></div>
+                    </div>
+                </div>
+
+                <!-- Sesiones activas (demo) -->
+                <div class="border-t border-gray-200 dark:border-gray-700 pt-6">
+                    <h3 class="text-md font-medium text-gray-700 dark:text-gray-300 mb-3">Sesiones Activas (Demo)</h3>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                            <thead class="bg-gray-50 dark:bg-gray-700">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Dispositivo</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Ubicación</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actividad</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                                <tr>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200"><i class="fas fa-desktop mr-2 text-gray-500"></i> Win 10 - Chrome</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">Madrid, ES</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">Ahora</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium"><button class="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 disabled:opacity-50" disabled>Cerrar</button></td>
+                                </tr>
+                                <tr>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200"><i class="fas fa-mobile-alt mr-2 text-gray-500"></i> iPhone - Safari</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">Barcelona, ES</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">Hace 2h</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium"><button class="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 disabled:opacity-50" disabled>Cerrar</button></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- =================== TAB ADVANCED =================== -->
+    <div id="advancedTabContent" class="settings-tab-content hidden">
+        <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-6 mb-6">
+            <h3 class="text-lg font-medium text-gray-800 dark:text-gray-100 mb-4">Impuestos Predeterminados</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label for="iva_rate" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tasa IVA (%)</label>
+                    <input type="text" id="iva_rate" name="iva_rate"
+                           value="{{ (settings.iva_rate * 100) | round(2) if settings.iva_rate is not none else '' }}"
+                           placeholder="Ej: 21 o 21,00"
+                           pattern="^\\d{1,2}([.,]\\d{1,4})?$"
+                           title="Introduce un porcentaje (ej: 21 o 21,0000)"
+                           class="form-input w-full pl-1 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200">
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Tasa IVA por defecto. Usa '.' o ',' como decimal.</p>
+                </div>
+                <div>
+                    <label for="irpf_rate" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tasa Retención IRPF (%)</label>
+                    <input type="text" id="irpf_rate" name="irpf_rate"
+                           value="{{ (settings.irpf_rate * 100) | round(2) if settings.irpf_rate is not none else '' }}"
+                           placeholder="Ej: 19 o 19,00"
+                           pattern="^\\d{1,2}([.,]\\d{1,4})?$"
+                           title="Introduce un porcentaje (ej: 19 o 19,0000)"
+                           class="form-input w-full pl-1 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200">
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Tasa IRPF por defecto. Usa '.' o ',' como decimal.</p>
+                </div>
+            </div>
+        </div>
+		
+		{# --- NUEVA SECCIÓN PARA OPCIÓN IPC --- #}
+    <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-6 mb-6"> {# <--- Aplicar mismas clases base que las otras tarjetas #}
+        <h3 class="text-lg font-medium text-gray-800 dark:text-gray-100 mb-4">Generación de Facturas</h3>
+        <div class="flex items-center justify-between">
+            <div>
+                <label for="generate_invoice_if_index_missing" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Generar factura si falta el dato de Índice (IPC/IRAV)
+                </label>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Si está activado, se generará la factura (sin el incremento del índice) y una notificación.<br>
+					Si está desactivado, solo se generará una notificación y la factura NO se creará hasta que se añada el dato del índice.
+                </p>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="generate_invoice_if_index_missing" name="generate_invoice_if_index_missing"
+                       class="sr-only peer" {% if settings.generate_invoice_if_index_missing %}checked{% endif %}>
+                <div class="w-11 h-6 bg-gray-200 rounded-full 
+                            peer peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 
+                            dark:peer-focus:ring-blue-800 dark:bg-gray-700 
+                            peer-checked:bg-blue-600">
+                </div>
+                <div class="absolute top-0.5 left-[2px] bg-white border-gray-300 border rounded-full 
+                            h-5 w-5 transition-all 
+                            dark:border-gray-600 
+                            peer-checked:translate-x-full peer-checked:border-white">
+                </div>
+            </label>
+        </div>
+    </div>
+        <!-- Demo Integraciones / API keys / Exportar / Backups sin cambios -->
+        <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-6 mb-6">
+            <h2 class="text-lg font-medium text-gray-800 dark:text-gray-100 mb-6">Configuración Avanzada (Ejemplos)</h2>
+            <!-- … resto del contenido Avanzado idéntico … -->
+        </div>
+    </div>
+
+
+    <!-- =================== TAB CORREO (NUEVA) =================== -->
+    <div id="emailTabContent" class="settings-tab-content hidden">
+        <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-6 mb-6">
+            <h2 class="text-lg font-medium text-gray-800 dark:text-gray-100 mb-4">Configuración del Servidor de Correo (SMTP)</h2>
+            <p class="text-sm text-gray-600 dark:text-gray-400 mb-6">
+                Introduce los datos de la cuenta de correo que se usará para enviar emails (ej: notificaciones, facturas).
+                <strong class="text-red-600 dark:text-red-400">¡Atención!</strong> La contraseña se guarda en la base de datos. Considera usar variables de entorno para mayor seguridad en producción.
+            </p>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <div>
+                    <label for="mail_server" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Servidor SMTP</label>
+                    <input type="text" id="mail_server" name="mail_server" value="{{ settings.mail_server or 'smtp.gmail.com' }}" class="form-input w-full pl-1 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200" placeholder="ej: smtp.example.com">
+                </div>
+                 <div>
+                    <label for="mail_port" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Puerto SMTP</label>
+                    <input type="number" id="mail_port" name="mail_port" value="{{ settings.mail_port or 587 }}" class="form-input w-full pl-1 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200" placeholder="ej: 587 (TLS) o 465 (SSL)">
+                </div>
+                 <div class="md:col-span-2 flex items-center space-x-8">
+                     <div class="flex items-center">
+                        <input id="mail_use_tls" name="mail_use_tls" type="checkbox" {% if settings.mail_use_tls %}checked{% endif %} class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 dark:bg-gray-700 dark:border-gray-600">
+                        <label for="mail_use_tls" class="ml-2 block text-sm text-gray-900 dark:text-gray-300">Usar TLS</label>
+                    </div>
+                    <div class="flex items-center">
+                        <input id="mail_use_ssl" name="mail_use_ssl" type="checkbox" {% if settings.mail_use_ssl %}checked{% endif %} class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 dark:bg-gray-700 dark:border-gray-600">
+                        <label for="mail_use_ssl" class="ml-2 block text-sm text-gray-900 dark:text-gray-300">Usar SSL</label>
+                    </div>
+                 </div>
+                <div>
+                    <label for="mail_username" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Usuario (Email)</label>
+                    <input type="email" id="mail_username" name="mail_username" value="{{ settings.mail_username or '' }}" class="form-input w-full pl-1 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200" placeholder="tu_email@example.com">
+                </div>
+                <div>
+                    <label for="mail_password" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Contraseña</label>
+                    <input type="password" id="mail_password" name="mail_password" value="{{ settings.mail_password or '' }}" class="form-input w-full pl-1 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200" placeholder="Contraseña o Clave de App">
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Si usas Gmail 2FA, genera una contraseña de aplicación.</p>
+                </div>
+                 <div>
+                    <label for="mail_default_sender" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email Remitente</label>
+                    <input type="email" id="mail_default_sender" name="mail_default_sender" value="{{ settings.mail_default_sender or settings.mail_username or '' }}" class="form-input w-full pl-1 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200" placeholder="email_desde_el_que_se_envia@example.com">
+                     <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">La dirección que aparecerá como 'De:'. Puede ser la misma que el usuario.</p>
+                </div>
+                 <div>
+                    <label for="mail_sender_display_name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nombre Remitente</label>
+                    <input type="text" id="mail_sender_display_name" name="mail_sender_display_name" value="{{ settings.mail_sender_display_name or 'RentalSys' }}" class="form-input w-full pl-1 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200" placeholder="Nombre que ve el receptor">
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- FIN TAB CORREO -->
+
+    <!-- Botón Guardar -->
+    <div class="mt-8 flex justify-end">
+        <button id="saveButton" type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-800">
+            Guardar Todos los Cambios
+        </button>
+    </div>
+
+</form>
+
+<!-- Estilo toggles -->
+<style>
+    .toggle-bg {
+        @apply w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600;
+    }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+/* ——— Cambiar pestañas ——— */
+function changeTab(tabName){
+    document.querySelectorAll('.settings-tab-content').forEach(t=>t.classList.add('hidden'));
+    document.querySelectorAll('.tab-button').forEach(b=>{
+        b.classList.remove('tab-active','text-blue-600','border-blue-600','dark:text-blue-400','dark:border-blue-400');
+        b.classList.add('text-gray-500','hover:text-gray-700','hover:border-gray-300','border-transparent','dark:text-gray-400','dark:hover:text-gray-300','dark:hover:border-gray-600');
+    });
+    const c=document.getElementById(tabName+'TabContent'); if(c)c.classList.remove('hidden');
+    const btn=document.getElementById(tabName+'Tab');
+    if(btn){
+        btn.classList.add('tab-active','text-blue-600','border-blue-600','dark:text-blue-400','dark:border-blue-400');
+        btn.classList.remove('text-gray-500','hover:text-gray-700','hover:border-gray-300','border-transparent','dark:text-gray-400','dark:hover:text-gray-300','dark:hover:border-gray-600');
+    }
+    try{localStorage.setItem('activeSettingsTab',tabName);}catch(e){}
+}
+
+/* ——— Previsualizar logo ——— */
+const logoInput=document.getElementById('companyLogo');
+const logoPreview=document.getElementById('currentLogo');
+const defaultLogo="https://via.placeholder.com/128/E0E7FF/4F46E5?text=Logo";
+const currentLogo=logoPreview?logoPreview.src:defaultLogo;
+if(logoInput&&logoPreview){
+    logoInput.addEventListener('change',e=>{
+        const file=e.target.files[0];
+        if(file&&file.type.startsWith('image/')){
+            if(file.size>2*1024*1024){alert('El archivo es demasiado grande (2MB máx).');logoInput.value='';logoPreview.src=currentLogo;return;}
+            const r=new FileReader(); r.onload=ev=>logoPreview.src=ev.target.result; r.readAsDataURL(file);
+        }else{
+            logoPreview.src=currentLogo; if(file)alert('Formato no válido (JPG, PNG, GIF, SVG).');
+        }
+    });
+}
+
+/* ——— Placeholders ——— */
+function regenerateApiKey(t){alert(`Regenerar API Key (${t}) pendiente.`);}
+function copyToClipboard(id){const el=document.getElementById(id); if(el){navigator.clipboard.writeText(el.value); alert('Copiado');}}
+function exportData(fmt){alert(`Exportar ${fmt} pendiente.`);}
+function downloadBackup(){alert('Descargar backup pendiente.');}
+
+/* ——— Init ——— */
+document.addEventListener('DOMContentLoaded',()=>{
+    changeTab(localStorage.getItem('activeSettingsTab')||'general');
+    const form=document.getElementById('settingsForm');
+    if(form){
+        form.addEventListener('submit',()=>{
+            const btn=document.getElementById('saveButton');
+            if(btn){btn.disabled=true;btn.innerHTML='<i class=\"fas fa-spinner fa-spin mr-2\"></i> Guardando...';}
+        });
+    }
+    const btn=document.getElementById('saveButton');
+    if(btn)btn.addEventListener('click',()=>{
+        const f=document.getElementById('settingsForm');
+        if(f&&!f.checkValidity())console.warn('Campos inválidos');
+    });
+});
+</script>
+{% endblock %}

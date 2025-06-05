@@ -1,0 +1,957 @@
+{% extends 'base.html' %}
+{% block title %}Gastos - RentalSys{% endblock %}
+{% block header_title %}Gestión de Gastos{% endblock %}
+
+{% block content %}
+{# Contenedor principal con altura completa #}
+<div class="flex flex-col h-full">
+    {# Sección fija superior #}
+    <div class="flex-shrink-0">
+        {# --- Encabezado con botón Nuevo Gasto --- #}
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+            <h2 class="text-2xl font-semibold text-gray-800 dark:text-gray-100 mb-4 md:mb-0">
+                <i class="fas fa-receipt mr-2 text-gray-600 dark:text-gray-400"></i>
+                Gestión de Gastos
+            </h2>
+            <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+                <button onclick="showCreateExpenseModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                    <i class="fas fa-plus mr-2"></i> Nuevo gasto
+                </button>
+                <div class="relative">
+                    <input type="text" id="quickSearch" placeholder="Buscar gastos..." 
+                        class="form-input pl-10 pr-4 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 focus:border-blue-500 focus:ring-blue-500" 
+                        onkeyup="quickSearchExpenses()">
+                    <div class="absolute left-3 top-2.5 text-gray-400"><i class="fas fa-search"></i></div>
+                </div>
+            </div>
+        </div>
+
+        {# --- Filtros y Búsqueda --- #}
+        <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow mb-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                {# Filtro Propietario #}
+                <div>
+                    <label for="filterExpenseOwner" class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Propietario</label>
+                    <select id="filterExpenseOwner" class="form-input w-full text-sm" onchange="updateFilterContractOptions(); applyExpenseFilters();">
+                        <option value="all" selected>Todos</option>
+                        {% for owner in propietarios %}
+                            <option value="{{ owner.id }}">{{ owner.nombre | truncate(20, True) }}</option>
+                        {% else %}
+                            <option value="" disabled>No hay</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                {# Filtro Contrato #}
+                <div>
+                    <label for="filterExpenseContract" class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Contrato</label>
+                    <select id="filterExpenseContract" class="form-input w-full text-sm" onchange="applyExpenseFilters()">
+                        <option value="all">Todos</option>
+                        {% for c in contratos %}
+                            <option value="{{ c.id }}" data-owner-id="{{ c.propiedad_ref.propietario_id if c.propiedad_ref else '' }}">
+                                {{ c.numero_contrato | truncate(20, True) }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                {# Filtro Estado #}
+                <div>
+                    <label for="filterExpenseStatus" class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Estado</label>
+                    <select id="filterExpenseStatus" class="form-input w-full text-sm" onchange="applyExpenseFilters()">
+                        <option value="all" selected>Todos</option>
+                        <option value="Pendiente">Pendientes</option>
+                        <option value="Facturado">Facturados</option>
+                    </select>
+                </div>
+
+                {# Filtro Mes #}
+                <div>
+                    <label for="filterExpenseMonth" class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Mes</label>
+                    <select id="filterExpenseMonth" class="form-input w-full text-sm" onchange="applyExpenseFilters()">
+                        <option value="all" selected>Todos</option>
+                        {% for i in range(1, 13) %}
+                            <option value="{{ i }}">{{ ["", "Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"][i] }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                {# Filtro Año #}
+                <div>
+                    <label for="filterExpenseYear" class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Año</label>
+                    <input type="number" id="filterExpenseYear" min="2000" max="{{ now().year + 1 }}" 
+                        class="form-input w-full text-sm" placeholder="Año" oninput="applyExpenseFilters()">
+                </div>
+
+                {# Búsqueda Texto #}
+                <div>
+                    <label for="expenseSearch" class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Buscar</label>
+                    <div class="relative">
+                        <input type="text" id="expenseSearch" placeholder="Concepto..." 
+                            class="form-input w-full pl-8 pr-2 py-1.5 text-sm" onkeyup="applyExpenseFilters()">
+                        <div class="absolute left-2 top-1.5 text-gray-400 dark:text-gray-500">
+                            <i class="fas fa-search text-sm"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {# --- Contador y Botones de Vista --- #}
+        <div class="mb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-2 sm:space-y-0">
+            <div class="text-sm text-gray-500 dark:text-gray-400">
+                Mostrando <span id="visibleExpenseCount" class="font-medium">{{ gastos|length }}</span> de 
+                <span id="totalExpenseCount" class="font-medium">{{ gastos|length }}</span> gastos
+            </div>
+            <div class="inline-flex rounded-md shadow-sm self-end sm:self-center">
+                <button id="tableViewBtnExpenses" onclick="toggleExpenseView('table')" 
+                    class="px-4 py-2 text-sm font-medium rounded-l-lg border dark:border-gray-600 bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-600 focus:z-10 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                    <i class="fas fa-table mr-2"></i><span class="hidden sm:inline">Tabla</span>
+                </button>
+                <button id="cardViewBtnExpenses" onclick="toggleExpenseView('card')" 
+                    class="px-4 py-2 text-sm font-medium rounded-r-lg border dark:border-gray-600 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:z-10 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                    <i class="fas fa-th-large mr-2"></i><span class="hidden sm:inline">Tarjetas</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    {# Contenedor scrolleable para tabla y tarjetas #}
+    <div class="flex-grow overflow-y-auto" style="height: calc(100vh - 400px);">
+        {# --- Tabla Historial de Gastos --- #}
+        <div id="tableViewExpenses" class="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
+            <h3 class="text-xl font-semibold text-gray-800 dark:text-gray-100 mb-4 sr-only">Historial de Gastos (Tabla)</h3>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                    <thead class="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
+                        <tr>
+                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Contrato</th>
+                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Concepto</th>
+                            <th scope="col" class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Importe</th>
+                            <th scope="col" class="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Periodo</th>
+                            <th scope="col" class="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Estado</th>
+                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Factura</th>
+                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Fichero</th>
+                            <th scope="col" class="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Fecha</th>
+                            <th scope="col" class="relative px-4 py-3"><span class="sr-only">Acciones</span></th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                        {% for g in gastos %}
+                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 expense-row"
+                            data-id="{{ g.id }}"
+                            data-contrato-id="{{ g.contrato_id }}"
+                            data-owner-id="{{ g.contrato.propiedad_ref.propietario_id if g.contrato and g.contrato.propiedad_ref else '' }}"
+                            data-concepto="{{ g.concepto | e }}"
+                            data-importe="{{ g.importe }}"
+                            data-month="{{ g.month or '' }}"
+                            data-year="{{ g.year or '' }}"
+                            data-estado="{{ g.estado }}"
+                            data-factura-id="{{ g.factura_id or '' }}"
+                            data-factura-numero="{{ g.factura.numero_factura if g.factura else '' }}"
+                            data-filename="{{ g.filename }}"
+                            data-original-filename="{{ g.original_filename | e }}">
+                            <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-200">
+                                {{ g.contrato.numero_contrato if g.contrato else 'N/A' }}
+                            </td>
+                            <td class="px-4 py-2 text-sm text-gray-700 dark:text-gray-300 max-w-xs truncate" title="{{ g.concepto }}">
+                                {{ g.concepto | truncate(50, True) }}
+                            </td>
+                            <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-white text-right">
+                                {{ g.importe | currency }}
+                            </td>
+                            <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300 text-center">
+                                {{ g.month if g.month else '--' }}/{{ g.year if g.year else '----' }}
+                            </td>
+                            <td class="px-4 py-2 whitespace-nowrap text-center text-sm">
+                                {% if g.estado == 'Facturado' %}
+                                    <span class="status-badge status-facturado">Facturado</span>
+                                {% else %}
+                                    <span class="status-badge status-pendiente-gasto">Pendiente</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-2 whitespace-nowrap text-sm">
+                                {% if g.factura %}
+                                    <a href="{{ url_for('facturas_bp.ver_factura', id=g.factura_id) }}"
+                                       class="text-blue-600 hover:underline dark:text-blue-400 dark:hover:text-blue-300"
+                                       title="Ver Factura {{ g.factura.numero_factura }}">
+                                        {{ g.factura.numero_factura }}
+                                    </a>
+                                {% else %}
+                                    <span class="text-gray-400 dark:text-gray-500 italic">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-2 text-sm max-w-sm">
+                                <a href="{{ url_for('facturas_bp.download_expense', filename=g.filename) }}" target="_blank" 
+                                    class="text-blue-600 hover:underline dark:text-blue-400 dark:hover:text-blue-300 truncate block" 
+                                    title="{{ g.original_filename }}">
+                                    <i class="fas fa-paperclip mr-1 text-xs"></i>{{ g.original_filename | truncate(25, True) }}
+                                </a>
+                            </td>
+                            <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 text-center">
+                                {{ g.upload_date | date }}
+                            </td>
+                            <td class="px-4 py-2 whitespace-nowrap text-right text-sm font-medium space-x-2">
+                                <button onclick="editGasto(this)" class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300" title="Editar Gasto">
+                                    <i class="fas fa-edit fa-fw"></i>
+                                </button>
+                                {% if g.estado == 'Pendiente' %}
+                                    <button onclick="deleteGasto({{ g.id }})" class="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300" title="Eliminar Gasto">
+                                        <i class="fas fa-trash fa-fw"></i>
+                                    </button>
+                                {% else %}
+                                    <button class="text-gray-400 dark:text-gray-500 cursor-not-allowed" title="No se puede eliminar un gasto facturado" disabled>
+                                        <i class="fas fa-trash fa-fw"></i>
+                                    </button>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr id="no-gastos-row-table" {% if gastos %}style="display: none;"{% endif %}>
+                            <td colspan="9" class="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400 italic">
+                                No hay gastos registrados.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        <tr id="no-filtered-gastos-row-table" style="display: none;">
+                            <td colspan="9" class="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400 italic">
+                                No se encontraron gastos que coincidan con los filtros aplicados.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        {# --- Vista Tarjetas --- #}
+        <div id="cardViewExpenses" class="hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-4">
+            {% if gastos %}
+                {% for g in gastos %}
+                <div class="expense-card bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden transition duration-300 ease-in-out expense-row"
+                     data-id="{{ g.id }}"
+                     data-contrato-id="{{ g.contrato_id }}"
+                     data-owner-id="{{ g.contrato.propiedad_ref.propietario_id if g.contrato and g.contrato.propiedad_ref else '' }}"
+                     data-concepto="{{ g.concepto | e }}" 
+                     data-importe="{{ g.importe }}" 
+                     data-month="{{ g.month or '' }}" 
+                     data-year="{{ g.year or '' }}" 
+                     data-estado="{{ g.estado }}" 
+                     data-factura-id="{{ g.factura_id or '' }}" 
+                     data-factura-numero="{{ g.factura.numero_factura if g.factura else '' }}" 
+                     data-filename="{{ g.filename }}" 
+                     data-original-filename="{{ g.original_filename | e }}">
+                    <div class="p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50">
+                        <div class="flex justify-between items-center">
+                            <p class="text-sm font-semibold text-gray-700 dark:text-gray-200 truncate" title="{{ g.concepto }}">
+                                {{ g.concepto | truncate(30, True) }}
+                            </p>
+                            {% if g.estado == 'Facturado' %} 
+                                <span class="status-badge status-facturado text-xs">Facturado</span>
+                            {% else %} 
+                                <span class="status-badge status-pendiente-gasto text-xs">Pendiente</span> 
+                            {% endif %}
+                        </div>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            Contrato: {{ g.contrato.numero_contrato if g.contrato else 'N/A' }}
+                        </p>
+                        {% if g.factura %}
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            Factura:
+                            <a href="{{ url_for('facturas_bp.ver_factura', id=g.factura_id) }}"
+                               class="text-blue-500 hover:underline dark:text-blue-400"
+                               title="Ver Factura {{ g.factura.numero_factura }}">
+                                {{ g.factura.numero_factura }}
+                            </a>
+                        </p>
+                        {% endif %}
+                    </div>
+                    <div class="p-4">
+                        <div class="flex justify-between items-baseline mb-3">
+                            <div>
+                                <p class="text-xs text-gray-500 dark:text-gray-400">Importe:</p>
+                                <p class="text-lg font-bold text-gray-900 dark:text-white">{{ g.importe | currency }}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-500 dark:text-gray-400 text-right">Periodo:</p>
+                                <p class="text-sm font-medium text-gray-800 dark:text-gray-100 text-right">
+                                    {{ g.month if g.month else '--' }}/{{ g.year if g.year else '----' }}
+                                </p>
+                            </div>
+                        </div>
+                        <div class="mb-4">
+                            <p class="text-xs text-gray-500 dark:text-gray-400">Archivo:</p>
+                            <a href="{{ url_for('facturas_bp.download_expense', filename=g.filename) }}" target="_blank" 
+                                class="text-sm text-blue-600 hover:underline dark:text-blue-400 dark:hover:text-blue-300 truncate block" 
+                                title="{{ g.original_filename }}">
+                                <i class="fas fa-paperclip mr-1 text-xs"></i>{{ g.original_filename | truncate(30, True) }}
+                            </a>
+                        </div>
+                        <div class="flex justify-between items-center pt-3 border-t border-gray-200 dark:border-gray-700">
+                            <p class="text-xs text-gray-500 dark:text-gray-400">Subido: {{ g.upload_date | date }}</p>
+                            <div class="flex space-x-1">
+                                <button onclick="editGasto(this)" 
+                                    class="p-2 rounded-full text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/50 focus:outline-none focus:ring-1 focus:ring-blue-500" 
+                                    title="Editar Gasto">
+                                    <i class="fas fa-edit fa-fw"></i>
+                                </button>
+                                {% if g.estado == 'Pendiente' %}
+                                    <button onclick="deleteGasto({{ g.id }})" 
+                                        class="p-2 rounded-full text-red-600 hover:bg-red-100 dark:hover:bg-red-900/50 focus:outline-none focus:ring-1 focus:ring-red-500" 
+                                        title="Eliminar Gasto">
+                                        <i class="fas fa-trash fa-fw"></i>
+                                    </button>
+                                {% else %}
+                                    <button class="p-2 rounded-full text-gray-400 dark:text-gray-500 cursor-not-allowed" 
+                                        title="No se puede eliminar" disabled>
+                                        <i class="fas fa-trash fa-fw"></i>
+                                    </button>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+                <div id="no-filtered-gastos-card" class="hidden md:col-span-2 lg:col-span-3 xl:col-span-4 text-center text-gray-500 dark:text-gray-400 mt-6 p-4 border dark:border-gray-700 rounded-md italic">
+                    No se encontraron gastos que coincidan con los filtros aplicados.
+                </div>
+            {% else %}
+                <p id="no-gastos-card" class="md:col-span-2 lg:col-span-3 xl:col-span-4 text-center text-gray-500 dark:text-gray-400 mt-4">
+                    No hay gastos registrados.
+                </p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{# --- Modales --- #}
+<!-- Modal: Crear Nuevo Gasto -->
+<div id="createExpenseModal" class="fixed inset-0 overflow-y-auto hidden z-50">
+    <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div class="fixed inset-0 transition-opacity" aria-hidden="true"><div class="absolute inset-0 bg-gray-500 opacity-75"></div></div>
+        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">​</span>
+        <div class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-3xl sm:w-full">
+            <form id="addExpenseForm" action="{{ url_for('facturas_bp.gestionar_gastos') }}" method="POST" enctype="multipart/form-data">
+                {{ csrf_form.csrf_token }}
+                <div class="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white mb-6">Registrar Nuevo Gasto</h3>
+                    
+                    <div class="space-y-4">
+                        {# Primera fila: Propietario y Contrato #}
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label for="ownerSelectForExpense" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Propietario <span class="text-red-500">*</span>
+                                </label>
+                                <select id="ownerSelectForExpense" name="ownerSelectForExpense" required 
+                                    class="form-input w-full text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200" 
+                                    onchange="updateContractOptions()">
+                                    <option value="">— Selecciona un Propietario —</option>
+                                    {% for owner in propietarios %}
+                                        <option value="{{ owner.id }}">{{ owner.nombre }}</option>
+                                    {% else %}
+                                        <option value="" disabled>No hay propietarios</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label for="contractSelect" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Contrato Asociado <span class="text-red-500">*</span>
+                                </label>
+                                <select id="contractSelect" name="contractSelect" required 
+                                    class="form-input w-full text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200" disabled>
+                                    <option value="">— Selecciona un Propietario primero —</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        {# Segunda fila: Concepto e Importe #}
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div class="md:col-span-2">
+                                <label for="expenseConcepto" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Concepto <span class="text-red-500">*</span>
+                                </label>
+                                <input type="text" id="expenseConcepto" name="expenseConcepto" required maxlength="255" 
+                                    class="form-input w-full text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200" 
+                                    placeholder="Ej: Factura luz, Agua, Recogida basura...">
+                            </div>
+                            
+                            <div>
+                                <label for="expenseImporte" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Importe (€) <span class="text-red-500">*</span>
+                                </label>
+                                <input type="number" step="0.01" min="0.01" id="expenseImporte" name="expenseImporte" required 
+                                    class="form-input w-full text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200" 
+                                    placeholder="0,00">
+                            </div>
+                        </div>
+                        
+                        {# Tercera fila: Mes y Año #}
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div>
+                                <label for="expenseMonth" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Mes (opcional)
+                                </label>
+                                <select id="expenseMonth" name="expenseMonth" 
+                                    class="form-input w-full text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200">
+                                    <option value="">--</option>
+                                    {% for i in range(1, 13) %}
+                                        <option value="{{ i }}">{{ ["", "Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"][i] }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label for="expenseYear" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Año (opcional)
+                                </label>
+                                <input type="number" min="2000" max="{{ now().year + 1 }}" id="expenseYear" name="expenseYear" 
+                                    class="form-input w-full text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200" 
+                                    placeholder="{{ now().year }}">
+                            </div>
+                        </div>
+                        
+                        {# Cuarta fila: Archivos #}
+                        <div>
+                            <label for="expenseFiles" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Adjuntar Ficheros <span class="text-red-500">*</span>
+                            </label>
+                            <div id="dropZone" class="relative border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6 text-center cursor-pointer hover:border-gray-400 dark:hover:border-gray-500 transition-colors duration-200">
+                                <input type="file" id="expenseFiles" name="expenseFiles" multiple required 
+                                    accept=".pdf,.png,.jpg,.jpeg,.gif" 
+                                    class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
+                                    onchange="updateFileInfo()" 
+                                    title="Haz clic o arrastra archivos aquí"/>
+                                <div class="text-gray-500 dark:text-gray-400">
+                                    <i class="fas fa-cloud-upload-alt fa-3x mb-2"></i>
+                                    <p class="text-sm font-semibold">
+                                        Arrastra archivos aquí o <span class="text-blue-600 dark:text-blue-400">haz clic para seleccionar</span>
+                                    </p>
+                                    <p id="fileInfo" class="text-xs mt-1"></p>
+                                    <p class="mt-1 text-xs">Permitidos: PDF, PNG, JPG, GIF. Puede seleccionar varios.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gray-50 dark:bg-gray-900 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse border-t dark:border-gray-700">
+                    <button type="submit" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm">
+                        <i class="fas fa-upload mr-2"></i> Registrar Gasto
+                    </button>
+                    <button type="button" onclick="closeModal('createExpenseModal')" class="mt-3 w-full inline-flex justify-center rounded-md border dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-800 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                        Cancelar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Editar Gasto -->
+<div id="editGastoModal" class="fixed inset-0 overflow-y-auto hidden z-50">
+    <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div class="fixed inset-0 transition-opacity" aria-hidden="true"><div class="absolute inset-0 bg-gray-500 opacity-75"></div></div>
+        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">​</span>
+        <div class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-3xl sm:w-full">
+            <form id="editGastoForm" action="" method="POST">
+                {{ csrf_form.csrf_token }}			
+                <div class="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white mb-6">Editar Gasto</h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2">
+                        <div class="lg:col-span-3">
+                            <label for="editContractSelect" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Contrato Asociado<span class="text-red-500">*</span>
+                            </label>
+                            <select id="editContractSelect" name="editContractSelect" required 
+                                class="form-input w-full pl-1 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200">
+                                <option value="">— Selecciona —</option>
+                                {% for c in contratos %}
+                                    <option value="{{ c.id }}">{{ c.numero_contrato }} ({{ c.propiedad_ref.direccion | truncate(40, True) if c.propiedad_ref else 'N/A' }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="lg:col-span-2">
+                            <label for="editExpenseConcepto" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Concepto<span class="text-red-500">*</span>
+                            </label>
+                            <input type="text" id="editExpenseConcepto" name="editExpenseConcepto" required maxlength="255" 
+                                class="form-input w-full pl-1 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200">
+                        </div>
+                        <div class="lg:col-span-1">
+                            <label for="editExpenseImporte" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Importe (€)<span class="text-red-500">*</span>
+                            </label>
+                            <input type="number" step="0.01" min="0.01" id="editExpenseImporte" name="editExpenseImporte" required 
+                                class="form-input w-full pl-1 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200">
+                        </div>
+                        <div class="lg:col-span-1">
+                            <label for="editExpenseMonth" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Mes Gasto (opc.)
+                            </label>
+                            <input type="number" min="1" max="12" id="editExpenseMonth" name="editExpenseMonth" 
+                                class="form-input w-full pl-1 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200">
+                        </div>
+                        <div class="lg:col-span-1">
+                            <label for="editExpenseYear" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Año Gasto (opc.)
+                            </label>
+                            <input type="number" min="2000" max="{{ now().year + 1 }}" id="editExpenseYear" name="editExpenseYear" 
+                                class="form-input w-full pl-1 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200">
+                        </div>
+                        <div class="lg:col-span-3 mt-4">
+                            <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Archivo Adjunto:</p>
+                            <p id="editExpenseFileInfo" class="text-sm text-gray-500 dark:text-gray-400 italic mt-1">Nombre archivo</p>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">(El archivo adjunto no se puede modificar desde aquí)</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gray-50 dark:bg-gray-900 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse border-t dark:border-gray-700">
+                    <button type="submit" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm">
+                        Guardar Cambios
+                    </button>
+                    <button type="button" onclick="closeModal('editGastoModal')" class="mt-3 w-full inline-flex justify-center rounded-md border dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-800 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                        Cancelar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Confirmar Eliminación Gasto -->
+<div id="deleteGastoModal" class="fixed inset-0 overflow-y-auto hidden z-50">
+    <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div class="fixed inset-0 transition-opacity" aria-hidden="true"><div class="absolute inset-0 bg-gray-500 opacity-75"></div></div>
+        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">​</span>
+        <div class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            <div class="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div class="sm:flex sm:items-start">
+                    <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 dark:bg-red-900/30 sm:mx-0 sm:h-10 sm:w-10">
+                        <i class="fas fa-exclamation-triangle text-red-600 dark:text-red-400"></i>
+                    </div>
+                    <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white">Eliminar Gasto</h3>
+                        <div class="mt-2">
+                            <p class="text-sm text-gray-500 dark:text-gray-400">
+                                ¿Seguro que deseas eliminar el gasto "<strong id="deleteGastoConcepto" class="text-gray-700 dark:text-gray-200"></strong>"? 
+                                Se eliminará también el archivo adjunto.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-50 dark:bg-gray-900 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse border-t dark:border-gray-700">
+                <button id="confirmDeleteGastoButton" type="button" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm">
+                    Eliminar
+                </button>
+                <button type="button" onclick="closeModal('deleteGastoModal')" class="mt-3 w-full inline-flex justify-center rounded-md border dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-800 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                    Cancelar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Datos globales de contratos
+    const allContractsData = [
+        {% for c in contratos %}
+            {
+                id: {{ c.id }},
+                number: "{{ c.numero_contrato | e }}",
+                property_address: "{{ c.propiedad_ref.direccion | default('Dirección N/A', true) | e }}",
+                owner_id: {{ c.propiedad_ref.propietario_id if c.propiedad_ref else 'null' }},
+                tenant_name: "{{ c.inquilino_ref.nombre | default('Inquilino N/A', true) | e }}"
+            }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+
+    // Función para mostrar modal de crear gasto
+    function showCreateExpenseModal() {
+        const form = document.getElementById('addExpenseForm');
+        if (form) form.reset();
+        
+        // Resetear selects
+        document.getElementById('ownerSelectForExpense').value = '';
+        document.getElementById('contractSelect').value = '';
+        document.getElementById('contractSelect').disabled = true;
+        
+        // Limpiar info de archivos
+        document.getElementById('fileInfo').textContent = '';
+        
+        showModal('createExpenseModal');
+    }
+
+    // Función de búsqueda rápida
+    function quickSearchExpenses() {
+        // Llamar a applyExpenseFilters que ahora maneja tanto búsqueda rápida como filtros
+        applyExpenseFilters();
+    }
+
+    // Función para actualizar contador de elementos visibles
+    function updateVisibleCount() {
+        const visibleRows = document.querySelectorAll('.expense-row:not([style*="display: none"])').length;
+        const totalRows = document.querySelectorAll('.expense-row').length;
+        
+        const visibleCountEl = document.getElementById('visibleExpenseCount');
+        const totalCountEl = document.getElementById('totalExpenseCount');
+        
+        if(visibleCountEl) visibleCountEl.textContent = visibleRows;
+        if(totalCountEl) totalCountEl.textContent = totalRows;
+        
+        // Mostrar/ocultar mensajes de "sin resultados"
+        const hasGastos = totalRows > 0;
+        const isTableView = uiExpenseState.currentView === 'table';
+        
+        const noFilteredRow = document.getElementById('no-filtered-gastos-row-table');
+        const noFilteredCard = document.getElementById('no-filtered-gastos-card');
+        const noGastosRow = document.getElementById('no-gastos-row-table');
+        const noGastosCard = document.getElementById('no-gastos-card');
+        
+        if(noFilteredRow) noFilteredRow.style.display = (hasGastos && visibleRows === 0 && isTableView) ? '' : 'none';
+        if(noFilteredCard) noFilteredCard.style.display = (hasGastos && visibleRows === 0 && !isTableView) ? 'block' : 'none';
+        if(noGastosRow) noGastosRow.style.display = hasGastos ? 'none' : (isTableView ? '' : 'none');
+        if(noGastosCard) noGastosCard.style.display = hasGastos ? 'none' : (!isTableView ? 'block' : 'none');
+    }
+
+    // Función para actualizar opciones de contrato
+    function updateContractOptions() {
+        const ownerSelect = document.getElementById('ownerSelectForExpense');
+        const contractSelect = document.getElementById('contractSelect');
+        const selectedOwnerId = ownerSelect.value;
+
+        contractSelect.innerHTML = '';
+
+        if (selectedOwnerId) {
+            const filteredContracts = allContractsData.filter(contract => contract.owner_id == selectedOwnerId);
+            const defaultOption = document.createElement('option');
+            defaultOption.value = "";
+
+            if (filteredContracts.length > 0) {
+                defaultOption.textContent = "— Selecciona un Contrato —";
+                contractSelect.disabled = false;
+                contractSelect.required = true;
+                contractSelect.classList.remove('bg-gray-100', 'dark:bg-gray-700', 'cursor-not-allowed');
+            } else {
+                defaultOption.textContent = "— Este propietario no tiene contratos —";
+                contractSelect.disabled = true;
+                contractSelect.required = false;
+                contractSelect.classList.add('bg-gray-100', 'dark:bg-gray-700', 'cursor-not-allowed');
+            }
+            contractSelect.appendChild(defaultOption);
+
+            filteredContracts.forEach(contract => {
+                const option = document.createElement('option');
+                option.value = contract.id;
+                option.textContent = `${contract.number} (${contract.property_address}) - (${contract.tenant_name})`;
+                contractSelect.appendChild(option);
+            });
+        } else {
+            const option = document.createElement('option');
+            option.value = "";
+            option.textContent = "— Selecciona un Propietario primero —";
+            contractSelect.appendChild(option);
+            contractSelect.disabled = true;
+            contractSelect.required = false;
+            contractSelect.classList.add('bg-gray-100', 'dark:bg-gray-700', 'cursor-not-allowed');
+        }
+        contractSelect.setCustomValidity('');
+    }
+
+    // Función para actualizar opciones de contrato en filtros
+    function updateFilterContractOptions() {
+        const ownerFilterSelect = document.getElementById('filterExpenseOwner');
+        const contractFilterSelect = document.getElementById('filterExpenseContract');
+        const selectedOwnerId = ownerFilterSelect.value;
+        const currentContractValue = contractFilterSelect.value;
+
+        contractFilterSelect.innerHTML = '<option value="all" selected>Todos los Contratos</option>';
+
+        if (selectedOwnerId !== 'all') {
+            const filteredContracts = allContractsData.filter(contract => contract.owner_id == selectedOwnerId);
+
+            if (filteredContracts.length > 0) {
+                filteredContracts.forEach(contract => {
+                    const option = document.createElement('option');
+                    option.value = contract.id;
+                    option.textContent = `${contract.number} (${contract.property_address}) - (${contract.tenant_name})`;
+                    contractFilterSelect.appendChild(option);
+                });
+                if (filteredContracts.some(c => c.id == currentContractValue)) {
+                    contractFilterSelect.value = currentContractValue;
+                } else {
+                    contractFilterSelect.value = 'all';
+                }
+            }
+        }
+    }
+
+    // Función para actualizar información de archivos
+    function updateFileInfo() {
+        const input = document.getElementById('expenseFiles');
+        const fileInfo = document.getElementById('fileInfo');
+        if (input.files.length > 1) {
+            fileInfo.textContent = `${input.files.length} archivos seleccionados`;
+        } else if (input.files.length === 1) {
+            fileInfo.textContent = input.files[0].name;
+        } else {
+            fileInfo.textContent = '';
+        }
+    }
+
+    // Drag & Drop handlers
+    const dropZone = document.getElementById('dropZone');
+    if (dropZone) {
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+            }, false);
+        });
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => {
+                dropZone.classList.add('border-blue-500', 'bg-blue-50', 'dark:bg-gray-700');
+            }, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => {
+                dropZone.classList.remove('border-blue-500', 'bg-blue-50', 'dark:bg-gray-700');
+            }, false);
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            const input = document.getElementById('expenseFiles');
+            input.files = e.dataTransfer.files;
+            updateFileInfo();
+        });
+    }
+
+    // Estado UI
+    const uiExpenseState = {
+        currentView: 'table',
+        filters: { search: '', owner: 'all', contract: 'all', month: 'all', year: '', status: 'all' }
+    };
+
+    // Función para editar gasto
+    function editGasto(buttonElement) {
+        const row = buttonElement.closest('.expense-row');
+        if (!row) return;
+        const data = row.dataset;
+        const gastoId = data.id;
+        if (!gastoId) return;
+
+        document.getElementById('editContractSelect').value = data.contratoId || '';
+        document.getElementById('editExpenseConcepto').value = data.concepto || '';
+        document.getElementById('editExpenseImporte').value = data.importe || '';
+        document.getElementById('editExpenseMonth').value = data.month || '';
+        document.getElementById('editExpenseYear').value = data.year || '';
+        document.getElementById('editExpenseFileInfo').textContent = data.originalFilename || 'Archivo no disponible';
+
+        const editForm = document.getElementById('editGastoForm');
+        editForm.action = `{{ url_for('facturas_bp.edit_gasto', id=0) }}`.replace('0', gastoId);
+        showModal('editGastoModal');
+    }
+
+    // Función para eliminar gasto
+    function deleteGasto(id) {
+        const row = document.querySelector(`.expense-row[data-id="${id}"]`);
+        const concepto = row ? row.dataset.concepto : `ID ${id}`;
+        document.getElementById('deleteGastoConcepto').textContent = concepto;
+        const confirmBtn = document.getElementById('confirmDeleteGastoButton');
+
+        const csrfToken = document.querySelector('#addExpenseForm input[name="csrf_token"]')?.value ||
+                          document.querySelector('#editGastoForm input[name="csrf_token"]')?.value ||
+                          document.querySelector('meta[name="csrf-token"]')?.content || '';
+
+        if (!csrfToken) {
+            console.error("¡Token CSRF no encontrado!");
+            alert("Error de seguridad. No se puede eliminar.");
+            return;
+        }
+
+        confirmBtn.onclick = () => {
+            if (typeof confirmDeleteWithToken === 'function') {
+                confirmDeleteWithToken('deleteGastoModal', `{{ url_for('facturas_bp.delete_gasto', id=0) }}`.replace('0', id), csrfToken);
+            } else {
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = `{{ url_for('facturas_bp.delete_gasto', id=0) }}`.replace('0', id);
+                const csrfInput = document.createElement('input');
+                csrfInput.type = 'hidden';
+                csrfInput.name = 'csrf_token';
+                csrfInput.value = csrfToken;
+                form.appendChild(csrfInput);
+                document.body.appendChild(form);
+                form.submit();
+            }
+        };
+        showModal('deleteGastoModal');
+    }
+
+    // Función para aplicar filtros
+    function applyExpenseFilters() {
+        // Leer valores de búsqueda rápida y filtros
+        const quickSearchTerm = document.getElementById('quickSearch')?.value.toLowerCase() || '';
+        uiExpenseState.filters.search = document.getElementById('expenseSearch').value.toLowerCase();
+        uiExpenseState.filters.owner = document.getElementById('filterExpenseOwner').value;
+        uiExpenseState.filters.contract = document.getElementById('filterExpenseContract').value;
+        uiExpenseState.filters.status = document.getElementById('filterExpenseStatus').value;
+        uiExpenseState.filters.month = document.getElementById('filterExpenseMonth').value;
+        uiExpenseState.filters.year = document.getElementById('filterExpenseYear').value;
+
+        document.querySelectorAll('.expense-row').forEach(row => {
+            const data = row.dataset;
+            let show = true;
+
+            // Primero aplicar búsqueda rápida si existe
+            if (quickSearchTerm) {
+                const concepto = (data.concepto || '').toLowerCase();
+                const contractNumber = row.querySelector('td:first-child')?.textContent.toLowerCase() || '';
+                const filename = (data.originalFilename || '').toLowerCase();
+                
+                show = concepto.includes(quickSearchTerm) || 
+                      contractNumber.includes(quickSearchTerm) || 
+                      filename.includes(quickSearchTerm);
+            }
+
+            // Luego aplicar filtros adicionales solo si pasa la búsqueda rápida
+            if (show && uiExpenseState.filters.search && !(data.concepto || '').toLowerCase().includes(uiExpenseState.filters.search)) {
+                show = false;
+            }
+            if (show && uiExpenseState.filters.owner !== 'all' && data.ownerId !== uiExpenseState.filters.owner) {
+                show = false;
+            }
+            if (show && uiExpenseState.filters.contract !== 'all' && data.contratoId !== uiExpenseState.filters.contract) {
+                show = false;
+            }
+            if (show && uiExpenseState.filters.status !== 'all' && data.estado !== uiExpenseState.filters.status) {
+                show = false;
+            }
+            if (show && uiExpenseState.filters.month !== 'all' && data.month !== uiExpenseState.filters.month) {
+                show = false;
+            }
+            if (show && uiExpenseState.filters.year && data.year !== uiExpenseState.filters.year) {
+                show = false;
+            }
+
+            row.style.display = show ? (uiExpenseState.currentView === 'table' ? '' : 'block') : 'none';
+        });
+
+        updateVisibleCount();
+    }
+
+    // Función para cambiar entre vista tabla y tarjetas
+    function toggleExpenseView(view) {
+        const tableView = document.getElementById('tableViewExpenses');
+        const cardView = document.getElementById('cardViewExpenses');
+        const tableBtn = document.getElementById('tableViewBtnExpenses');
+        const cardBtn = document.getElementById('cardViewBtnExpenses');
+
+        if (!tableView || !cardView || !tableBtn || !cardBtn) return;
+
+        if (view === 'table') {
+            tableView.classList.remove('hidden');
+            cardView.classList.add('hidden');
+            tableBtn.classList.add('bg-white', 'dark:bg-gray-700', 'text-blue-600', 'dark:text-blue-400');
+            tableBtn.classList.remove('bg-gray-100', 'dark:bg-gray-800', 'text-gray-700', 'dark:text-gray-300');
+            cardBtn.classList.add('bg-gray-100', 'dark:bg-gray-800', 'text-gray-700', 'dark:text-gray-300');
+            cardBtn.classList.remove('bg-white', 'dark:bg-gray-700', 'text-blue-600', 'dark:text-blue-400');
+            uiExpenseState.currentView = 'table';
+        } else {
+            tableView.classList.add('hidden');
+            cardView.classList.remove('hidden');
+            cardBtn.classList.add('bg-white', 'dark:bg-gray-700', 'text-blue-600', 'dark:text-blue-400');
+            cardBtn.classList.remove('bg-gray-100', 'dark:bg-gray-800', 'text-gray-700', 'dark:text-gray-300');
+            tableBtn.classList.add('bg-gray-100', 'dark:bg-gray-800', 'text-gray-700', 'dark:text-gray-300');
+            tableBtn.classList.remove('bg-white', 'dark:bg-gray-700', 'text-blue-600', 'dark:text-blue-400');
+            uiExpenseState.currentView = 'card';
+        }
+        applyExpenseFilters();
+    }
+
+    // Funciones de modal
+    function showModal(id) {
+        const m = document.getElementById(id);
+        if(m) m.classList.remove('hidden');
+    }
+
+    function closeModal(id) {
+        const m = document.getElementById(id);
+        if(m) m.classList.add('hidden');
+    }
+
+    // Ajustar altura del contenedor scrolleable
+    function adjustScrollHeight() {
+        const header = document.querySelector('.flex-shrink-0');
+        const scrollContainer = document.querySelector('.flex-grow.overflow-y-auto');
+        if (header && scrollContainer) {
+            const headerHeight = header.offsetHeight;
+            const windowHeight = window.innerHeight;
+            const navHeight = 64; // Altura aproximada de la navegación superior
+            const padding = 32; // Padding adicional
+            const newHeight = windowHeight - headerHeight - navHeight - padding;
+            scrollContainer.style.height = `${newHeight}px`;
+        }
+    }
+
+    // Inicialización
+    document.addEventListener("DOMContentLoaded", function() {
+        // Ajustar altura inicial
+        adjustScrollHeight();
+        window.addEventListener('resize', adjustScrollHeight);
+        
+        // Inicializar vista y filtros
+        toggleExpenseView('table');
+        applyExpenseFilters();
+        
+        // Cerrar modales con Escape
+        document.addEventListener('keydown', (event) => {
+            if (event.key === "Escape") {
+                closeModal('createExpenseModal');
+                closeModal('editGastoModal');
+                closeModal('deleteGastoModal');
+            }
+        });
+    });
+</script>
+{% endblock %}
+
+{% block styles %}
+<style>
+    /* Estilos para badges de estado */
+    .status-facturado {
+        background-color: #dcfce7;
+        color: #16a34a;
+        padding: 0.125rem 0.5rem;
+        border-radius: 0.375rem;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+    .dark .status-facturado {
+        background-color: #14532d;
+        color: #86efac;
+    }
+    .status-pendiente-gasto {
+        background-color: #fef9c3;
+        color: #ca8a04;
+        padding: 0.125rem 0.5rem;
+        border-radius: 0.375rem;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+    .dark .status-pendiente-gasto {
+        background-color: #713f12;
+        color: #fde047;
+    }
+    
+    /* Mejorar apariencia del dropzone */
+    #dropZone.border-blue-500 {
+        border-color: #3b82f6 !important;
+    }
+</style>
+{% endblock %}

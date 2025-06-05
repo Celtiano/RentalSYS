@@ -1,0 +1,179 @@
+{% extends 'base.html' %}
+
+{% block title %}Notificaciones - RentalSys{% endblock %}
+{% block header_title %}Notificaciones{% endblock %}
+
+{% block content %}
+<div class="flex justify-between items-center mb-6">
+    <h2 class="text-2xl font-semibold text-gray-800 dark:text-gray-100">Centro de Notificaciones</h2>
+    {# Botón para eliminar leídas (solo si hay notificaciones) #}
+    {% if notifications %}
+        <form action="{{ url_for('main_bp.delete_all_read_notifications') }}" method="POST" onsubmit="return confirm('¿Seguro que deseas eliminar todas las notificaciones leídas?');">
+			{{ csrf_form.csrf_token }} 
+            <button type="submit"
+                    class="bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 px-3 py-1.5 rounded-md text-xs font-medium focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-gray-400 disabled:opacity-50"
+                    {# Deshabilitar si no hay ninguna leída podría ser una mejora #}
+                    title="Eliminar todas las notificaciones leídas">
+                <i class="fas fa-trash-alt mr-1"></i> Eliminar Leídas
+            </button>
+        </form>
+    {% endif %}
+</div>
+
+<div class="bg-white dark:bg-gray-800 rounded-lg shadow">
+    <ul class="divide-y divide-gray-200 dark:divide-gray-700">
+        {% if notifications %}
+            {% for notification in notifications %}
+                {# --- MODIFICACIÓN: Añadir clase y data attribute para JS --- #}
+                <li class="p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 flex items-center justify-between space-x-4 notification-item {{ 'opacity-70' if notification.is_read else '' }}"
+                    data-id="{{ notification.id }}"
+                    data-read="{{ 'true' if notification.is_read else 'false' }}"
+                    data-url="{{ notification.related_url or '' }}">
+
+                    {# Contenido Principal (AHORA DENTRO DE UN FORM/DIV CLICKEABLE) #}
+                    {# Usamos un div con onclick para manejar el POST y la navegación #}
+					<div class="flex items-start space-x-3 flex-1 min-w-0 cursor-pointer"
+					onclick="handleNotificationClick({{ notification.id }}, {{ notification.is_read | tojson }}, '{{ notification.related_url or '' }}', '{{ csrf_form.csrf_token.current_token }}')">
+              
+                        {# Icono según nivel #}
+                        <span class="flex-shrink-0 mt-1">
+                             {% if notification.level == 'danger' %} <i class="fas fa-times-circle text-red-500 dark:text-red-400 fa-fw"></i>
+                             {% elif notification.level == 'warning' %} <i class="fas fa-exclamation-triangle text-yellow-500 dark:text-yellow-400 fa-fw"></i>
+                             {% elif notification.level == 'success' %} <i class="fas fa-check-circle text-green-500 dark:text-green-400 fa-fw"></i>
+                             {% else %} <i class="fas fa-info-circle text-blue-500 dark:text-blue-400 fa-fw"></i> {% endif %}
+                        </span>
+                        {# Mensaje y Timestamp #}
+                        <div class="min-w-0 flex-1">
+                            <p class="text-sm text-gray-800 dark:text-gray-100 {{ 'font-normal' if notification.is_read else 'font-semibold' }}">
+                                {{ notification.message }}
+                                {# Mostrar un icono de enlace si hay URL #}
+                                {% if notification.related_url %}<i class="fas fa-link text-xs text-gray-400 ml-1"></i>{% endif %}
+                            </p>
+                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                {{ notification.timestamp | date }}
+                            </p>
+                        </div>
+                    </div>
+
+                    {# Botón Eliminar Individual (sin cambios) #}
+                    <form action="{{ url_for('main_bp.delete_notification', id=notification.id) }}" method="POST" class="flex-shrink-0">
+                        {{ csrf_form.csrf_token }}
+						<button type="submit" class="text-gray-400 hover:text-red-600 dark:hover:text-red-400 focus:outline-none" title="Eliminar esta notificación">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </form>
+                </li>
+            {% endfor %}
+        {% else %}
+            <li class="p-6 text-center text-sm text-gray-500 dark:text-gray-400 italic">
+                No hay notificaciones.
+            </li>
+        {% endif %}
+    </ul>
+</div>
+
+{# --- Formulario Oculto para Marcar como Leída --- #}
+<form id="markReadForm" action="" method="POST" style="display: none;">
+    {{ csrf_form.csrf_token }}
+    {# CSRF Token si usas Flask-WTF #}
+    {# {{ csrf_token() }} #}
+</form>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+
+	function handleNotificationClick(notificationId, isRead, relatedUrl, csrfTokenValue) {
+		console.log("handleNotificationClick llamado con:"); // LOG 1
+		console.log("  ID:", notificationId, "isRead:", isRead, "relatedUrl:", relatedUrl); // LOG 2
+		console.log("  CSRF Token Recibido:", csrfTokenValue); // LOG 3
+
+		const form = document.getElementById('markReadForm');
+		if (!form) {
+			console.error("Formulario oculto 'markReadForm' no encontrado.");
+			if (relatedUrl) window.location.href = relatedUrl;
+			return;
+		}
+
+		// Asegurarse de que el input del token en el form oculto tenga el valor correcto
+		let formCsrfInput = form.querySelector('input[name="csrf_token"]');
+		if (!formCsrfInput) {
+			console.log("Input CSRF no encontrado en markReadForm, creando uno."); // LOG 4
+			formCsrfInput = document.createElement('input');
+			formCsrfInput.type = 'hidden';
+			formCsrfInput.name = 'csrf_token';
+			form.appendChild(formCsrfInput);
+		}
+		formCsrfInput.value = csrfTokenValue; // Asignar el token pasado
+		console.log("Valor del token CSRF en el form oculto:", formCsrfInput.value); // LOG 5
+
+		if (!isRead) {
+			form.action = `/notifications/read/${notificationId}`; // Asume URL base correcta
+			console.log("Acción del formulario para marcar como leída:", form.action); // LOG 6
+
+			const formDataForFetch = new FormData(form);
+			console.log("Contenido de FormData para enviar:"); // LOG 7
+			for (let [key, value] of formDataForFetch.entries()) {
+				console.log(`  ${key}: ${value}`);
+			}
+
+			fetch(form.action, {
+				method: 'POST',
+				body: formDataForFetch
+				// No se necesita 'X-CSRFToken' header si el token está en FormData
+			})
+			.then(response => {
+				console.log("Respuesta del fetch:", response.status, response.ok); // LOG 8
+				if (!response.ok) {
+					console.error(`Error ${response.status} al marcar notificación ${notificationId} como leída.`);
+					return response.text().then(text => { // Leer el cuerpo del error
+						console.error("Cuerpo de la respuesta de error:", text);
+						throw new Error(`Error ${response.status}: ${text.substring(0,100)}...`); // Incluir parte del texto del error
+					});
+				}
+				// Si la respuesta es OK, intentar parsear como JSON si se espera
+				// Si no se espera JSON, simplemente proceder
+				return response.text(); // O response.json() si esperas JSON
+			})
+			.then(data => { // 'data' sería el texto o el JSON parseado
+				console.log("Datos de la respuesta (marcar como leída):", data); // LOG 9
+				console.log(`Notificación ${notificationId} marcada como leída (o ya estaba leída).`);
+				const listItem = document.querySelector(`.notification-item[data-id="${notificationId}"]`);
+				if (listItem) {
+					listItem.classList.add('opacity-70');
+					const textElement = listItem.querySelector('p.text-sm.font-semibold'); // Buscar específicamente el semibold
+					if (textElement) {
+						textElement.classList.remove('font-semibold');
+						textElement.classList.add('font-normal');
+					}
+					listItem.dataset.read = 'true'; // Actualizar estado en el frontend
+				}
+				// Navegar DESPUÉS
+				if (relatedUrl) {
+					console.log("Navegando a relatedUrl:", relatedUrl); // LOG 10
+					window.location.href = relatedUrl;
+				}
+			})
+			.catch(error => {
+				console.error('Error en fetch para marcar como leída:', error); // LOG 11
+				// Considerar si se debe navegar incluso si hay error
+				if (relatedUrl) {
+					 console.log("Navegando a relatedUrl después de error en fetch:", relatedUrl); // LOG 12
+					 window.location.href = relatedUrl;
+				} else {
+					 alert("Error al marcar la notificación como leída: " + error.message);
+				}
+			});
+		} else { // Si ya está leída
+			console.log("Notificación ya está leída. Navegando si hay URL."); // LOG 13
+			if (relatedUrl) {
+				console.log("Navegando a relatedUrl:", relatedUrl); // LOG 14
+				window.location.href = relatedUrl;
+			}
+		}
+	}
+
+    // ... (otras funciones JS que pudieras tener) ...
+</script>
+{% endblock %}

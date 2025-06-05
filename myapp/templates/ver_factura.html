@@ -1,0 +1,224 @@
+{% extends 'base.html' %}
+
+{% block title %}Factura {{ invoice.numero_factura if invoice else 'No encontrada' }} - RentalSys{% endblock %}
+{% block header_title %}Detalle Factura {{ invoice.numero_factura if invoice else '' }}{% endblock %}
+
+{% block content %}
+{% if invoice %}
+<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 md:p-8 max-w-4xl mx-auto print:shadow-none print:p-0">
+  {# --- Cabecera Emisor (Usa el objeto 'propietario' pasado desde la ruta) y Datos Factura --- #}
+  <div class="flex flex-col sm:flex-row justify-between items-start mb-8 pb-4 border-b dark:border-gray-700 print:border-b-2 print:border-black">
+    <div class="mb-4 sm:mb-0 max-w-xs">
+      {# --- Muestra datos del Propietario (objeto 'propietario') --- #}
+      <h2 class="text-lg font-semibold text-gray-700 dark:text-gray-200 print:text-black">
+        {# Accede al campo 'nombre' del modelo Propietario #}
+        {{ propietario.nombre if propietario else 'Datos Emisor (No disponible)' }}
+      </h2>
+      {% if propietario %} {# Comprueba que el objeto propietario no sea None #}
+        {# Accede a los campos del modelo Propietario #}
+        <p class="text-sm text-gray-500 dark:text-gray-400 print:text-gray-600">NIF: {{ propietario.nif if propietario.nif else 'N/A' }}</p>
+        {% if propietario.direccion %}
+          <p class="text-sm text-gray-500 dark:text-gray-400 print:text-gray-600">{{ propietario.direccion }}</p>
+        {% endif %}
+        {% if propietario.codigo_postal or propietario.ciudad %}
+           <p class="text-sm text-gray-500 dark:text-gray-400 print:text-gray-600">{{ propietario.codigo_postal or '' }} {{ propietario.ciudad or '' }}</p>
+        {% endif %}
+        {% if propietario.email %}
+          <p class="text-sm text-gray-500 dark:text-gray-400 print:text-gray-600">{{ propietario.email }}</p>
+        {% endif %}
+         {% if propietario.telefono %}
+          <p class="text-sm text-gray-500 dark:text-gray-400 print:text-gray-600">Tel: {{ propietario.telefono }}</p>
+        {% endif %}
+         {% if propietario.cuenta_bancaria %} {# Campo adicional del modelo Propietario #}
+          <p class="text-sm text-gray-500 dark:text-gray-400 print:text-gray-600">IBAN: {{ propietario.cuenta_bancaria }}</p>
+        {% endif %}
+      {% endif %}
+      {# --- Fin datos del Propietario --- #}
+    </div>
+    <div class="text-left sm:text-right w-full sm:w-auto">
+      <h1 class="text-2xl font-bold text-gray-800 dark:text-gray-100 uppercase print:text-3xl print:text-black">Factura</h1>
+      <p class="text-gray-600 dark:text-gray-300 print:text-black">Número: <span class="font-semibold">{{ invoice.numero_factura }}</span></p>
+      <p class="text-gray-600 dark:text-gray-300 print:text-black">Fecha Emisión: <span class="font-semibold">{{ invoice.fecha_emision | date }}</span></p>
+    </div>
+  </div>
+
+  {# --- Datos Cliente y Referencia Propiedad --- #}
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 print:flex print:justify-between">
+    <div class="print:w-1/2 print:pr-4">
+      <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 print:text-gray-600">Facturar a:</h3>
+      {% if invoice.inquilino_ref %}
+        <p class="font-medium text-gray-800 dark:text-gray-100 print:text-black">{{ invoice.inquilino_ref.nombre }}</p>
+        <p class="text-sm text-gray-600 dark:text-gray-300 print:text-gray-700">NIF: {{ invoice.inquilino_ref.nif }}</p>
+        {% if invoice.inquilino_ref.direccion %}
+          <p class="text-sm text-gray-600 dark:text-gray-300 print:text-gray-700">{{ invoice.inquilino_ref.direccion }}</p>
+          <p class="text-sm text-gray-600 dark:text-gray-300 print:text-gray-700">{{ invoice.inquilino_ref.codigo_postal }} {{ invoice.inquilino_ref.ciudad }}</p>
+        {% endif %}
+      {% else %}
+        <p class="text-sm text-red-600 dark:text-red-400 italic">(Inquilino no disponible)</p>
+      {% endif %}
+    </div>
+    <div class="md:text-right print:w-1/2 print:pl-4 print:text-right">
+      <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 print:text-gray-600">Referente a:</h3>
+      {% if invoice.propiedad_ref %}
+        <p class="font-medium text-gray-800 dark:text-gray-100 print:text-black">{{ invoice.propiedad_ref.direccion }}</p>
+        {% if invoice.propiedad_ref.referencia_catastral %}
+          <p class="text-sm text-gray-600 dark:text-gray-300 print:text-gray-700">Ref. Cat.: {{ invoice.propiedad_ref.referencia_catastral }}</p>
+        {% endif %}
+		
+        {% if invoice.propiedad_ref.descripcion %}
+          <p class="text-xs text-gray-500 dark:text-gray-400 print:text-gray-600 mt-1">{{ invoice.propiedad_ref.descripcion }}</p>
+        {% endif %}		
+		
+		
+      {% else %}
+        <p class="text-sm text-red-600 dark:text-red-400 italic">(Propiedad no disponible)</p>
+      {% endif %}
+      {% if invoice.contrato_ref %}
+        <p class="text-sm text-gray-600 dark:text-gray-300 mt-1 print:text-gray-700">Contrato: {{ invoice.contrato_ref.numero_contrato }}</p>
+      {% else %}
+        <p class="text-sm text-gray-500 dark:text-gray-400 italic mt-1 print:text-gray-600">(Contrato no disponible)</p>
+      {% endif %}
+    </div>
+  </div>
+
+  {# --- Tabla de Conceptos --- #}
+  <div class="overflow-x-auto mb-8 border rounded-md dark:border-gray-700 print:border print:border-gray-400 print:rounded-none">
+    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700 print:divide-y print:divide-gray-400">
+      <thead class="bg-gray-100 dark:bg-gray-700 print:bg-gray-200">
+        <tr>
+          <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider print:text-black">Descripción</th>
+          <th class="px-6 py-3 text-center text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider print:text-black">Cantidad</th>
+          <th class="px-6 py-3 text-right text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider print:text-black">Precio Unit.</th>
+          <th class="px-6 py-3 text-right text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider print:text-black">Total</th>
+        </tr>
+      </thead>
+      <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700 print:divide-y print:divide-gray-400">
+        {% set items = invoice.items %}
+        {% if items %}
+          {% for item in items %}
+            <tr>
+              <td class="px-6 py-4 whitespace-normal text-sm text-gray-700 dark:text-gray-200 print:text-black">{{ item.get('description', 'N/A') }}</td>
+              <td class="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-700 dark:text-gray-200 print:text-black">{{ item.get('quantity', '-') }}</td>
+              <td class="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-700 dark:text-gray-200 print:text-black">{{ item.get('unitPrice', 0.0) | currency }}</td>
+              <td class="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-700 dark:text-gray-200 print:text-black">{{ item.get('total', 0.0) | currency }}</td>
+            </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="4" class="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400 italic print:text-gray-600">No hay conceptos detallados.</td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+
+  {# --- Notas, Estado y Totales (Diseño Original) --- #}
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 print:flex print:justify-between">
+    {# Bloque de Notas y Estado a la izquierda #}
+    <div class="md:col-span-2 print:w-2/3 print:pr-4">
+      {% if invoice.notas %}
+      <div class="mb-4">
+        <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 print:text-gray-600">Notas:</h3>
+        <p class="text-sm text-gray-600 dark:text-gray-300 whitespace-pre-wrap print:text-black">{{ invoice.notas }}</p>
+      </div>
+      {% endif %}
+      <div>
+        <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1 print:text-gray-600">Estado:</h3>
+        {% if invoice.estado == 'pagada' %}
+          <span class="status-badge status-paid print:text-green-700 print:border print:border-green-700 print:px-1 print:rounded">Pagada</span>
+        {% elif invoice.estado == 'pendiente' %}
+          <span class="status-badge status-pending print:text-yellow-700 print:border print:border-yellow-700 print:px-1 print:rounded">Pendiente</span>
+        {% elif invoice.estado == 'cancelada' %}
+          <span class="status-badge status-cancelada print:text-red-700 print:border print:border-red-700 print:px-1 print:rounded">Cancelada</span>
+        {% else %}
+          <span class="status-badge bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 print:text-gray-700 print:border print:border-gray-700 print:px-1 print:rounded">
+            {{ invoice.estado | capitalize }}
+          </span>
+        {% endif %}
+      </div>
+    </div>
+
+    {# Bloque de Totales a la derecha #}
+    <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-md border dark:border-gray-600 space-y-1 print:w-1/3 print:border print:border-gray-400 print:bg-white print:rounded-none print:p-2">
+      <div class="flex justify-between text-sm">
+        <span class="text-gray-600 dark:text-gray-300 print:text-gray-700">Subtotal:</span>
+        <span class="font-medium text-gray-800 dark:text-white print:text-black">{{ invoice.subtotal | currency }}</span>
+      </div>
+      <div class="flex justify-between text-sm">
+        <span class="text-gray-600 dark:text-gray-300 print:text-gray-700">IVA ({{ (iva_rate * 100) | round(2) if iva_rate else '0.00' }}%):</span>
+        <span class="font-medium text-gray-800 dark:text-white print:text-black">+ {{ invoice.iva | currency }}</span>
+      </div>
+      {% if invoice.irpf > 0 %}
+        <div class="flex justify-between text-sm text-red-700 dark:text-red-400 print:text-red-600">
+          <span class="text-red-600 dark:text-red-400 print:text-red-600">IRPF ({{ (irpf_rate * 100) | round(2) if irpf_rate else '0.00' }}%):</span>
+          <span class="font-medium">- {{ invoice.irpf | currency }}</span>
+        </div>
+      {% endif %}
+      <div class="flex justify-between text-base font-bold pt-2 border-t dark:border-gray-600 mt-2 print:border-t-2 print:border-black">
+        <span class="text-gray-900 dark:text-white print:text-black">TOTAL FACTURA:</span>
+        <span class="text-gray-900 dark:text-white print:text-black">{{ invoice.total | currency }}</span>
+      </div>
+    </div>
+  </div>
+  {# --- Fin Notas, Estado y Totales --- #}
+
+  {# --- Pie y Botones --- #}
+	<div class="mt-8 pt-4 border-t dark:border-gray-700 text-center print:hidden">
+	  <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">Gracias.</p>
+	  <div class="flex flex-col sm:flex-row justify-center items-center space-y-2 sm:space-y-0 sm:space-x-2">
+		<button onclick="window.print()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-md text-sm w-full sm:w-auto">
+		  <i class="fas fa-print mr-1"></i> Imprimir
+		</button>
+		<a href="{{ url_for('facturas_bp.download_factura', id=invoice.id) }}" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md text-sm inline-flex items-center justify-center w-full sm:w-auto">
+		  <i class="fas fa-download mr-1"></i> PDF
+		</a>
+
+		<form action="{{ url_for('facturas_bp.send_invoice_email', id=invoice.id) }}" method="POST" class="inline-block w-full sm:w-auto"
+			  onsubmit="this.querySelector('button').disabled=true; this.querySelector('button').innerHTML='<i class=\'fas fa-spinner fa-spin mr-2\'></i> Enviando...';">
+			{{ csrf_form.csrf_token }}
+			<button type="submit" class="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-md text-sm inline-flex items-center justify-center w-full"
+					title="Enviar factura por email al inquilino">
+				<i class="fas fa-paper-plane mr-2"></i> Email
+			</button>
+		</form>
+		
+		{% if invoice.estado != 'cancelada' and current_user.is_authenticated and current_user.role in ['admin', 'gestor'] %}
+		<button onclick="goToEditInvoice()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm inline-flex items-center justify-center w-full sm:w-auto">
+		  <i class="fas fa-edit mr-2"></i> Editar
+		</button>
+		{% endif %}
+		
+		<a href="{{ url_for('facturas_bp.listar_facturas') }}" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm inline-flex items-center justify-center w-full sm:w-auto">
+		  <i class="fas fa-list mr-2"></i> Lista Facturas
+		</a>
+	  </div>
+	</div>
+</div>
+{% else %}
+<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative max-w-4xl mx-auto" role="alert">
+  <strong class="font-bold">Error:</strong>
+  <span class="block sm:inline">Factura no encontrada.</span>
+  <a href="{{ url_for('facturas_bp.listar_facturas') }}" class="ml-4 text-red-800 hover:underline">Volver al listado</a>
+</div>
+{% endif %}
+{% endblock %}
+
+{# --- Estilos para Badges --- #}
+{% block styles %}
+<style>
+  .status-badge { display: inline-flex; padding: 0.125rem 0.5rem; font-size: 0.75rem; line-height: 1.25rem; font-weight: 600; border-radius: 9999px; text-transform: capitalize; }
+  .status-paid { background-color: #dcfce7; color: #16a34a; } .dark .status-paid { background-color: #14532d; color: #86efac; }
+  .status-pending { background-color: #fef9c3; color: #ca8a04; } .dark .status-pending { background-color: #713f12; color: #fde047; }
+  .status-cancelada { background-color: #fee2e2; color: #dc2626; text-decoration: line-through; } .dark .status-cancelada { background-color: #7f1d1d; color: #fca5a5; }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+	function goToEditInvoice() {
+		const invoiceId = "{{ invoice.id }}";
+		// Redirigir a la lista de facturas con parámetro para editar
+		window.location.href = "{{ url_for('facturas_bp.listar_facturas') }}?edit=" + invoiceId;
+	}
+</script>
+{% endblock %}
