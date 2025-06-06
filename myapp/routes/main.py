@@ -20,7 +20,15 @@ from myapp.models import (
 # Importar meses para IPC
 from ..routes.ipc import MESES_STR
 
-from ..decorators import role_required
+from ..decorators import (
+    role_required,
+    filtered_list_view, with_owner_filtering
+)
+from ..utils.database_helpers import (
+    get_filtered_propiedades, get_filtered_contratos, get_filtered_facturas,
+    OwnerFilteredQueries
+)
+from ..utils.owner_session import get_active_owner_context
 
 from ..forms import CSRFOnlyForm 
 from ..models import ( db, Propiedad, Contrato, Factura, SystemSettings,
@@ -213,8 +221,10 @@ def load_settings():
 def home(): return redirect(url_for('main_bp.dashboard'))
 
 @main_bp.route('/dashboard')
-@login_required # La protección de login ya debería estar
+@login_required
+@with_owner_filtering(require_active_owner=False, auto_select=True)
 def dashboard():
+    """Dashboard con estadísticas filtradas por propietario activo."""
     stats = {
         'properties_total': 0,
         'active_contracts': 0,
@@ -224,20 +234,27 @@ def dashboard():
         'pending_expenses_total': Decimal('0.00')
     }
     expiring_contracts = []
-    unread_notifications_for_dashboard = [] # Nombre específico para esta lista
+    unread_notifications_for_dashboard = []
     upcoming_ipc_reviews = []
     recent_activity = []
-    vacant_properties_list_for_dashboard = [] # Para la sección de propiedades vacías
+    vacant_properties_list_for_dashboard = []
 
     try:
-        # --- KPIs ---
-        stats['properties_total'] = db.session.query(func.count(Propiedad.id)).scalar() or 0
-        stats['active_contracts'] = db.session.query(func.count(Contrato.id)).filter(Contrato.estado == 'activo').scalar() or 0
+        # Estadísticas filtradas automáticamente por propietario activo
+        propiedades_query = get_filtered_propiedades()
+        contratos_query = get_filtered_contratos()
+        
+        stats['properties_total'] = propiedades_query.count()
+        stats['active_contracts'] = contratos_query.filter(Contrato.estado == 'activo').count()
 
-        potential_income_raw = db.session.query(func.sum(Contrato.precio_mensual)).filter(Contrato.estado == 'activo').scalar()
+        potential_income_raw = contratos_query.filter(Contrato.estado == 'activo').with_entities(func.sum(Contrato.precio_mensual)).scalar()
         stats['potential_monthly_income'] = potential_income_raw or Decimal('0.00')
+        
+        # Contar facturas filtradas por propietario activo
+        facturas_query = get_filtered_facturas()
+        stats['total_invoices'] = facturas_query.count()
 
-        stats['vacant_properties'] = db.session.query(func.count(Propiedad.id)).filter(Propiedad.estado_ocupacion == 'vacia').scalar() or 0
+        stats['vacant_properties'] = propiedades_query.filter(Propiedad.estado_ocupacion == 'vacia').count()
 
         if stats['properties_total'] > 0:
             occupied_count = stats['properties_total'] - stats['vacant_properties']
@@ -245,6 +262,7 @@ def dashboard():
         else:
             stats['occupancy_rate'] = 0.0
 
+        # Gastos pendientes (asumiendo que están relacionados con propiedades filtradas)
         pending_expenses_raw = db.session.query(func.sum(Gasto.importe)).filter(Gasto.estado == 'Pendiente').scalar()
         stats['pending_expenses_total'] = pending_expenses_raw or Decimal('0.00')
 

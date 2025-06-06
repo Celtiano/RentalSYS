@@ -1,0 +1,53 @@
+<!-- Breadcrumb con Información del Propietario Activo -->
+{% if has_active_owner %}
+<nav class="bg-gradient-to-r from-gray-50 to-blue-50 dark:from-gray-800 dark:to-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg px-4 py-3 mb-6" aria-label="Breadcrumb">
+    <div class="flex items-center space-x-2 text-sm">
+        <!-- Icono de Inicio -->
+        <a href="{{ url_for('main_bp.dashboard') }}" class="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition-colors">
+            <i class="fas fa-home"></i>
+            <span class="sr-only">Inicio</span>
+        </a>
+        
+        <!-- Separador -->
+        <svg class="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"></path>
+        </svg>
+        
+        <!-- Información del Propietario -->
+        <div class="flex items-center space-x-2 bg-white dark:bg-gray-700 rounded-md px-3 py-1 border border-gray-200 dark:border-gray-600">
+            <div class="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
+                <i class="fas fa-user-tie text-white text-xs"></i>
+            </div>
+            <span class="font-medium text-gray-700 dark:text-gray-300">{{ active_owner.nombre }}</span>
+            <span class="text-gray-500 dark:text-gray-400">|</span>
+            <span class="text-gray-600 dark:text-gray-400 text-xs">{{ active_owner.nif }}</span>
+            {% if active_owner.ciudad %}
+                <span class="text-gray-500 dark:text-gray-400">|</span>
+                <span class="text-gray-600 dark:text-gray-400 text-xs">
+                    <i class="fas fa-map-marker-alt mr-1"></i>{{ active_owner.ciudad }}
+                </span>
+            {% endif %}
+        </div>
+        
+        <!-- Separador -->
+        <svg class="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"></path>
+        </svg>
+        
+        <!-- Página Actual -->
+        <span class="text-gray-500 dark:text-gray-400 font-medium">
+            {% block breadcrumb_title %}{{ title | default('Panel') }}{% endblock %}
+        </span>
+        
+        <!-- Botón de Cambio Rápido -->
+        <div class="ml-auto">
+            <a href="{{ url_for('owner_selector_bp.select_owner') }}" 
+               class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors text-xs font-medium"
+               title="Cambiar propietario">
+                <i class="fas fa-exchange-alt mr-1"></i>
+                Cambiar
+            </a>
+        </div>
+    </div>
+</nav>
+{% endif %}

@@ -294,7 +294,8 @@ def create_app():
     from .routes.ipc import ipc_bp
     from .routes.admin_users import admin_users_bp
     from .routes.reports import reports_bp
-    from .routes.external_db_api import external_db_api_bp    
+    from .routes.external_db_api import external_db_api_bp
+    from .routes.owner_selector import owner_selector_bp    
 
     app.register_blueprint(auth_bp, url_prefix='/auth')
     app.register_blueprint(admin_users_bp, url_prefix='/admin/users')
@@ -305,7 +306,8 @@ def create_app():
     app.register_blueprint(contratos_bp,    url_prefix='/contratos')
     app.register_blueprint(facturas_bp,     url_prefix='/facturas')
     app.register_blueprint(ipc_bp,          url_prefix='/ipc')
-    app.register_blueprint(reports_bp,      url_prefix='/informes')
+    app.register_blueprint(reports_bp,      url_prefix='/reports')
+    app.register_blueprint(owner_selector_bp) # Ya tiene su propio url_prefix en el blueprint
 
     app.jinja_env.filters['currency'] = format_currency_safe
     app.jinja_env.filters['date'] = format_date_filter
@@ -355,5 +357,163 @@ def create_app():
     @app.context_processor
     def utility_processor():
         return dict(now=datetime.utcnow, today_date=date.today().isoformat())
+
+    # --- Context Processors para Propietario Activo ---
+    @app.context_processor
+    def inject_owner_context():
+        """Inyecta información del propietario activo en todos los templates."""
+        from .utils.owner_session import get_active_owner_context
+        
+        if current_user.is_authenticated:
+            try:
+                owner_context = get_active_owner_context()
+                return {
+                    'active_owner': owner_context.get('active_owner'),
+                    'available_owners': owner_context.get('available_owners', []),
+                    'has_active_owner': owner_context.get('has_active_owner', False),
+                    'user_can_change_owner': owner_context.get('can_change_owner', False),
+                    'owner_context': owner_context
+                }
+            except Exception as e:
+                logger_to_use = current_app.logger if hasattr(current_app, 'logger') else logging.getLogger(__name__)
+                logger_to_use.error(f"Error al inyectar contexto de propietario: {e}")
+                return {
+                    'active_owner': None,
+                    'available_owners': [],
+                    'has_active_owner': False,
+                    'user_can_change_owner': False,
+                    'owner_context': {}
+                }
+        
+        return {
+            'active_owner': None,
+            'available_owners': [],
+            'has_active_owner': False,
+            'user_can_change_owner': False,
+            'owner_context': {}
+        }
+
+    @app.context_processor
+    def inject_filtering_status():
+        """Inyecta estado del filtrado automático para debugging."""
+        from .utils.database_helpers import OwnerFilteredQueries
+        
+        # Solo incluir en desarrollo o si está habilitado explícitamente
+        if app.debug or app.config.get('INJECT_FILTERING_DEBUG', False):
+            try:
+                return {
+                    'filtering_enabled': OwnerFilteredQueries.should_apply_filter(),
+                    'debug_mode': app.debug
+                }
+            except Exception:
+                return {'filtering_enabled': False, 'debug_mode': app.debug}
+        
+        return {}
+
+    @app.context_processor
+    def inject_owner_stats():
+        """Inyecta estadísticas del propietario activo en templates que las necesiten."""
+        from .utils.database_helpers import OwnerFilteredQueries
+        
+        # Solo inyectar si hay propietario activo y el usuario está autenticado
+        if current_user.is_authenticated:
+            try:
+                from .utils.owner_session import has_active_owner
+                if has_active_owner():
+                    stats = OwnerFilteredQueries.get_stats_for_active_owner()
+                    return {'owner_stats': stats}
+            except Exception as e:
+                logger_to_use = current_app.logger if hasattr(current_app, 'logger') else logging.getLogger(__name__)
+                logger_to_use.error(f"Error al obtener estadísticas de propietario: {e}")
+        
+        return {'owner_stats': {}}
+
+    # --- Middleware para Gestión de Propietario Activo ---
+    @app.before_request
+    def validate_owner_session():
+        """
+        Middleware que valida la integridad de la sesión del propietario activo
+        en cada request para usuarios autenticados.
+        """
+        from flask_login import current_user
+        from .utils.owner_session import validate_session_integrity
+        
+        # Solo procesar si el usuario está autenticado
+        if current_user.is_authenticated:
+            try:
+                # Validar integridad de la sesión del propietario activo
+                validate_session_integrity()
+            except Exception as e:
+                # Log del error pero no interrumpir el request
+                logger_to_use = current_app.logger if hasattr(current_app, 'logger') else logging.getLogger(__name__)
+                logger_to_use.error(f"Error en middleware de propietario activo para {current_user.username}: {e}")
+
+    @app.before_request
+    def setup_filtering_context():
+        """
+        Middleware que configura el contexto de filtrado para la request actual.
+        """
+        from flask_login import current_user
+        from .utils.owner_session import get_active_owner, get_active_owner_context
+        from .utils.database_helpers import OwnerFilteredQueries
+        
+        # Configurar contexto de filtrado en g para uso en la request
+        if current_user.is_authenticated:
+            try:
+                g.active_owner = get_active_owner()
+                g.owner_context = get_active_owner_context()
+                g.filtering_should_apply = OwnerFilteredQueries.should_apply_filter()
+                
+                # Para debugging en desarrollo
+                if app.debug:
+                    g.debug_filtering_info = {
+                        'user_role': current_user.role,
+                        'has_active_owner': g.active_owner is not None,
+                        'active_owner_id': g.active_owner.id if g.active_owner else None,
+                        'should_filter': g.filtering_should_apply
+                    }
+                    
+            except Exception as e:
+                logger_to_use = current_app.logger if hasattr(current_app, 'logger') else logging.getLogger(__name__)
+                logger_to_use.error(f"Error configurando contexto de filtrado: {e}")
+                
+                # Configurar valores por defecto
+                g.active_owner = None
+                g.owner_context = {}
+                g.filtering_should_apply = False
+
+    @app.after_request
+    def log_filtering_activity(response):
+        """
+        Middleware que registra actividad de filtrado después de cada request.
+        Solo activo en modo debug o si está habilitado explícitamente.
+        """
+        if app.debug or app.config.get('LOG_FILTERING_ACTIVITY', False):
+            if current_user.is_authenticated and hasattr(g, 'debug_filtering_info'):
+                try:
+                    endpoint = request.endpoint or 'unknown'
+                    method = request.method
+                    
+                    # Solo logear para endpoints relevantes (no estáticos)
+                    if not endpoint.startswith('static') and not endpoint.startswith('owner_selector_bp'):
+                        current_app.logger.debug(
+                            f"Filtrado - {method} {endpoint}: "
+                            f"Usuario: {current_user.username} ({current_user.role}), "
+                            f"Propietario activo: {g.debug_filtering_info['active_owner_id']}, "
+                            f"Filtrado aplicado: {g.debug_filtering_info['should_filter']}"
+                        )
+                except Exception as e:
+                    # No interrumpir la respuesta por errores de logging
+                    pass
+        
+        return response
+
+    # --- Configuración de Filtrado Automático ---
+    try:
+        from .utils.query_filters import setup_automatic_filtering
+        setup_automatic_filtering(app)
+        app.logger.info("Sistema de filtrado automático inicializado correctamente")
+    except Exception as e:
+        app.logger.error(f"Error inicializando sistema de filtrado automático: {e}")
 
     return app

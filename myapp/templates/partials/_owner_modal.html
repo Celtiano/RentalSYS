@@ -1,0 +1,244 @@
+<!-- Modal para Cambio Rápido de Propietario -->
+<div id="ownerModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4" style="display: none;">
+    <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden">
+        <!-- Header del Modal -->
+        <div class="bg-gradient-to-r from-blue-500 to-indigo-600 text-white p-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="text-xl font-bold flex items-center">
+                        <i class="fas fa-users mr-3"></i>
+                        Cambiar Propietario
+                    </h3>
+                    <p class="text-blue-100 text-sm mt-1">Selecciona el propietario con el que deseas trabajar</p>
+                </div>
+                <button type="button" 
+                        class="text-white hover:text-blue-200 transition-colors"
+                        onclick="closeOwnerModal()">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Propietario Actual -->
+        {% if has_active_owner %}
+        <div class="bg-blue-50 dark:bg-blue-900/20 border-b border-blue-200 dark:border-blue-700 p-4">
+            <div class="flex items-center space-x-3">
+                <div class="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center">
+                    <i class="fas fa-crown text-white"></i>
+                </div>
+                <div>
+                    <div class="text-sm font-medium text-blue-600 dark:text-blue-400">Propietario Actual</div>
+                    <div class="font-bold text-blue-800 dark:text-blue-200">{{ active_owner.nombre }}</div>
+                    <div class="text-xs text-blue-600 dark:text-blue-400">{{ active_owner.nif }}</div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Lista de Propietarios -->
+        <div class="p-6 max-h-96 overflow-y-auto">
+            {% if available_owners %}
+                <div class="space-y-3">
+                    {% for owner in available_owners %}
+                        {% if not active_owner or owner.id != active_owner.id %}
+                        <div class="border border-gray-200 dark:border-gray-600 rounded-xl p-4 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors cursor-pointer owner-modal-item"
+                             data-owner-id="{{ owner.id }}"
+                             data-owner-name="{{ owner.nombre }}">
+                            <div class="flex items-center space-x-4">
+                                <div class="w-12 h-12 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-600 dark:to-gray-700 rounded-full flex items-center justify-center">
+                                    <i class="fas fa-user-tie text-blue-500 text-lg"></i>
+                                </div>
+                                <div class="flex-1">
+                                    <div class="font-semibold text-gray-800 dark:text-gray-200">{{ owner.nombre }}</div>
+                                    <div class="text-sm text-gray-600 dark:text-gray-400">
+                                        <i class="fas fa-id-card mr-1"></i>{{ owner.nif }}
+                                    </div>
+                                    {% if owner.ciudad %}
+                                        <div class="text-sm text-gray-500 dark:text-gray-500">
+                                            <i class="fas fa-map-marker-alt mr-1"></i>{{ owner.ciudad }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                <div class="flex items-center space-x-3">
+                                    <!-- Estadísticas rápidas -->
+                                    <div class="text-center">
+                                        <div class="text-lg font-bold text-blue-600 dark:text-blue-400">{{ owner.propiedades|length }}</div>
+                                        <div class="text-xs text-gray-500 dark:text-gray-400">Propiedades</div>
+                                    </div>
+                                    <div class="text-blue-500">
+                                        <i class="fas fa-chevron-right"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="text-center py-8">
+                    <div class="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-users text-gray-400 text-2xl"></i>
+                    </div>
+                    <p class="text-gray-500 dark:text-gray-400">No hay otros propietarios disponibles</p>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Footer del Modal -->
+        <div class="bg-gray-50 dark:bg-gray-700 px-6 py-4 border-t border-gray-200 dark:border-gray-600">
+            <div class="flex justify-between items-center">
+                <a href="{{ url_for('owner_selector_bp.select_owner') }}" 
+                   class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-sm">
+                    <i class="fas fa-cog mr-2"></i>
+                    Gestión avanzada
+                </a>
+                <button type="button" 
+                        class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors"
+                        onclick="closeOwnerModal()">
+                    <i class="fas fa-times mr-2"></i>
+                    Cerrar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Loading Modal -->
+<div id="ownerChangeModalLoading" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center" style="display: none;">
+    <div class="bg-white dark:bg-gray-800 rounded-2xl p-8 max-w-sm mx-4">
+        <div class="text-center">
+            <div class="w-16 h-16 border-4 border-blue-200 border-t-blue-500 rounded-full animate-spin mx-auto mb-4"></div>
+            <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-2">Cambiando propietario...</h3>
+            <p class="text-gray-600 dark:text-gray-400 text-sm">Esto puede tomar unos segundos</p>
+        </div>
+    </div>
+</div>
+
+<script>
+// Funciones para el modal de propietarios
+function openOwnerModal() {
+    const modal = document.getElementById('ownerModal');
+    if (modal) {
+        modal.style.display = 'flex';
+        modal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+        
+        // Animación de entrada
+        setTimeout(() => {
+            modal.style.backdropFilter = 'blur(4px)';
+        }, 10);
+    }
+}
+
+function closeOwnerModal() {
+    const modal = document.getElementById('ownerModal');
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+    }
+}
+
+function showChangeModalLoading() {
+    const loadingModal = document.getElementById('ownerChangeModalLoading');
+    if (loadingModal) {
+        loadingModal.style.display = 'flex';
+        loadingModal.classList.remove('hidden');
+    }
+}
+
+function hideChangeModalLoading() {
+    const loadingModal = document.getElementById('ownerChangeModalLoading');
+    if (loadingModal) {
+        loadingModal.classList.add('hidden');
+        loadingModal.style.display = 'none';
+    }
+}
+
+// Inicialización cuando el DOM esté listo
+document.addEventListener('DOMContentLoaded', function() {
+    // Cerrar modal al hacer clic fuera
+    const modal = document.getElementById('ownerModal');
+    if (modal) {
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal) {
+                closeOwnerModal();
+            }
+        });
+    }
+
+    // Funcionalidad de cambio de propietario
+    const ownerItems = document.querySelectorAll('.owner-modal-item');
+    ownerItems.forEach(item => {
+        item.addEventListener('click', function() {
+            const ownerId = this.dataset.ownerId;
+            const ownerName = this.dataset.ownerName;
+            
+            if (!ownerId) {
+                console.error('ID de propietario no encontrado');
+                return;
+            }
+            
+            // Cerrar modal normal y mostrar loading
+            closeOwnerModal();
+            showChangeModalLoading();
+            
+            // Realizar petición AJAX
+            fetch('{{ url_for("owner_selector_bp.api_change_owner") }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify({
+                    propietario_id: parseInt(ownerId)
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                hideChangeModalLoading();
+                
+                if (data.success) {
+                    // Mostrar notificación de éxito
+                    if (typeof showNotification === 'function') {
+                        showNotification(`Cambiado a ${ownerName}`, 'success');
+                    }
+                    
+                    // Recargar la página para actualizar el contenido
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                } else {
+                    // Mostrar error
+                    if (typeof showNotification === 'function') {
+                        showNotification(data.message || 'Error al cambiar propietario', 'error');
+                    } else {
+                        alert(data.message || 'Error al cambiar propietario');
+                    }
+                }
+            })
+            .catch(error => {
+                hideChangeModalLoading();
+                console.error('Error:', error);
+                
+                if (typeof showNotification === 'function') {
+                    showNotification('Error de conexión al cambiar propietario', 'error');
+                } else {
+                    alert('Error de conexión al cambiar propietario');
+                }
+            });
+        });
+    });
+
+    // Cerrar modal con ESC
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeOwnerModal();
+        }
+    });
+});
+
+// Hacer las funciones disponibles globalmente
+window.openOwnerModal = openOwnerModal;
+window.closeOwnerModal = closeOwnerModal;
+</script>

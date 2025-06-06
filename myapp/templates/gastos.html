@@ -341,17 +341,53 @@
                             <div>
                                 <label for="ownerSelectForExpense" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                     Propietario <span class="text-red-500">*</span>
+                                    {% if preselected_owner_id %}
+                                        <span class="text-green-600 dark:text-green-400 text-xs">(Preseleccionado)</span>
+                                    {% endif %}
                                 </label>
-                                <select id="ownerSelectForExpense" name="ownerSelectForExpense" required 
-                                    class="form-input w-full text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200" 
-                                    onchange="updateContractOptions()">
-                                    <option value="">— Selecciona un Propietario —</option>
-                                    {% for owner in propietarios %}
-                                        <option value="{{ owner.id }}">{{ owner.nombre }}</option>
+                                
+                                {% if preselected_owner_id %}
+                                    <!-- Mostrar propietario preseleccionado como texto con estilo de input -->
+                                    {% set active_owner = propietarios|selectattr("id", "equalto", preselected_owner_id)|first %}
+                                    {% if active_owner %}
+                                        <div class="form-input w-full text-sm bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-600 text-gray-800 dark:text-gray-200 flex items-center justify-between py-2.5">
+                                            <div class="flex items-center">
+                                                <span class="text-green-600 dark:text-green-400 mr-2">✓</span>
+                                                <span class="font-medium">{{ active_owner.nombre }}</span>
+                                                <span class="ml-2 text-xs text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-800 px-2 py-0.5 rounded">(Activo)</span>
+                                            </div>
+                                            <i class="fas fa-lock text-green-500 text-xs"></i>
+                                        </div>
+                                        <!-- Select oculto pero funcional para JavaScript -->
+                                        <select id="ownerSelectForExpense" class="hidden" onchange="updateContractOptions()">
+                                            <option value="{{ active_owner.id }}" selected>{{ active_owner.nombre }}</option>
+                                        </select>
+                                        <!-- Campo hidden para envío -->
+                                        <input type="hidden" name="ownerSelectForExpense" value="{{ preselected_owner_id }}">
                                     {% else %}
-                                        <option value="" disabled>No hay propietarios</option>
-                                    {% endfor %}
-                                </select>
+                                        <!-- Fallback si no se encuentra el propietario -->
+                                        <div class="form-input w-full text-sm bg-red-50 border-red-300 text-red-800 py-2.5">
+                                            <span class="text-red-600 mr-2">⚠</span>
+                                            Error: Propietario activo no encontrado (ID: {{ preselected_owner_id }})
+                                        </div>
+                                    {% endif %}
+                                    <p class="text-xs text-green-600 dark:text-green-400 mt-1">
+                                        <i class="fas fa-info-circle mr-1"></i>
+                                        Propietario preseleccionado por tener uno activo
+                                    </p>
+                                {% else %}
+                                    <!-- Select normal cuando no hay propietario preseleccionado -->
+                                    <select id="ownerSelectForExpense" name="ownerSelectForExpense" required 
+                                        class="form-input w-full text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200" 
+                                        onchange="updateContractOptions()">
+                                        <option value="">— Selecciona un Propietario —</option>
+                                        {% for owner in propietarios %}
+                                            <option value="{{ owner.id }}">{{ owner.nombre }}</option>
+                                        {% else %}
+                                            <option value="" disabled>No hay propietarios</option>
+                                        {% endfor %}
+                                    </select>
+                                {% endif %}
                             </div>
                             
                             <div>
@@ -574,10 +610,16 @@
         const form = document.getElementById('addExpenseForm');
         if (form) form.reset();
         
-        // Resetear selects
-        document.getElementById('ownerSelectForExpense').value = '';
-        document.getElementById('contractSelect').value = '';
-        document.getElementById('contractSelect').disabled = true;
+        // Resetear selects solo si no hay propietario preseleccionado
+        {% if not preselected_owner_id %}
+            document.getElementById('ownerSelectForExpense').value = '';
+            document.getElementById('contractSelect').value = '';
+            document.getElementById('contractSelect').disabled = true;
+        {% else %}
+            // Con propietario preseleccionado, solo resetear contratos
+            document.getElementById('contractSelect').value = '';
+            // Los contratos se actualizarán automáticamente por el JavaScript de DOMContentLoaded
+        {% endif %}
         
         // Limpiar info de archivos
         document.getElementById('fileInfo').textContent = '';
@@ -621,7 +663,20 @@
     function updateContractOptions() {
         const ownerSelect = document.getElementById('ownerSelectForExpense');
         const contractSelect = document.getElementById('contractSelect');
-        const selectedOwnerId = ownerSelect.value;
+        
+        // Obtener el ID del propietario seleccionado
+        let selectedOwnerId = '';
+        if (ownerSelect) {
+            selectedOwnerId = ownerSelect.value;
+        }
+        
+        // Si hay propietario preseleccionado pero el select está oculto, usar ese valor
+        {% if preselected_owner_id %}
+            if (!selectedOwnerId) {
+                selectedOwnerId = '{{ preselected_owner_id }}';
+                console.log('🔍 Usando propietario preseleccionado:', selectedOwnerId);
+            }
+        {% endif %}
 
         contractSelect.innerHTML = '';
 
@@ -878,6 +933,17 @@
     function showModal(id) {
         const m = document.getElementById(id);
         if(m) m.classList.remove('hidden');
+        
+        // Si es el modal de crear gasto y hay propietario preseleccionado, actualizar contratos
+        if(id === 'createExpenseModal') {
+            {% if preselected_owner_id %}
+                // Hay propietario preseleccionado, actualizar contratos automáticamente
+                setTimeout(function() {
+                    console.log('🔍 Modal abierto, actualizando contratos para propietario preseleccionado');
+                    updateContractOptions();
+                }, 100);
+            {% endif %}
+        }
     }
 
     function closeModal(id) {
@@ -917,6 +983,15 @@
                 closeModal('deleteGastoModal');
             }
         });
+    });
+
+    // Ejecutar cuando la página se carga: si hay propietario preseleccionado, actualizar contratos
+    document.addEventListener('DOMContentLoaded', function() {
+        {% if preselected_owner_id %}
+            // Si hay propietario preseleccionado, los contratos se actualizarán cuando se abra el modal
+            console.log('🔍 Propietario preseleccionado detectado: {{ preselected_owner_id }}');
+            console.log('🔍 Los contratos se actualizarán automáticamente al abrir el modal');
+        {% endif %}
     });
 </script>
 {% endblock %}

@@ -21,13 +21,38 @@
         <div class="space-y-6">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                    <label for="propietario_id" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Propietario (Opcional)</label>
-                    <select id="propietario_id" name="propietario_id" class="form-input w-full dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200" onchange="updateContractFilterOptions()">
-                        <option value="all">Todos Mis Propietarios</option>
-                        {% for p in propietarios %}
-                            <option value="{{ p.id }}">{{ p.nombre }}</option>
-                        {% endfor %}
+                    <label for="propietario_id" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Propietario 
+                        {% if preselected_owner_id %}
+                            <span class="text-green-600 dark:text-green-400 text-xs">(Preseleccionado)</span>
+                        {% else %}
+                            (Opcional)
+                        {% endif %}
+                    </label>
+                    <select id="propietario_id" name="propietario_id" 
+                            class="form-input w-full dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 {% if preselected_owner_id %}bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-600{% endif %}" 
+                            onchange="updateContractFilterOptions()"
+                            {% if preselected_owner_id %}disabled{% endif %}>
+                        {% if preselected_owner_id %}
+                            {% for p in propietarios %}
+                                {% if p.id == preselected_owner_id %}
+                                    <option value="{{ p.id }}" selected>{{ p.nombre }} (Activo)</option>
+                                {% endif %}
+                            {% endfor %}
+                        {% else %}
+                            <option value="all">Todos Mis Propietarios</option>
+                            {% for p in propietarios %}
+                                <option value="{{ p.id }}">{{ p.nombre }}</option>
+                            {% endfor %}
+                        {% endif %}
                     </select>
+                    {% if preselected_owner_id %}
+                        <input type="hidden" name="propietario_id" value="{{ preselected_owner_id }}">
+                        <p class="text-xs text-green-600 dark:text-green-400 mt-1">
+                            <i class="fas fa-info-circle mr-1"></i>
+                            Propietario preseleccionado por tener uno activo
+                        </p>
+                    {% endif %}
                 </div>
                 <div>
                     <label for="contrato_id" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Contrato (Opcional)</label>

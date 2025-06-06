@@ -6,7 +6,15 @@ from ..models import db, Inquilino, Contrato, Factura
 
 from flask_login import login_required, current_user
 from ..forms import CSRFOnlyForm
-from ..decorators import role_required
+from ..decorators import (
+    role_required, 
+    filtered_list_view, filtered_detail_view, with_owner_filtering, validate_entity_access
+)
+from ..utils.database_helpers import (
+    get_filtered_inquilinos, get_filtered_contratos,
+    OwnerFilteredQueries
+)
+from ..utils.owner_session import get_active_owner_context
 
 inquilinos_bp = Blueprint('inquilinos_bp', __name__)
 
@@ -17,26 +25,29 @@ def before_request():
     pass
 
 @inquilinos_bp.route('/', methods=['GET'])
+@filtered_list_view(entity_type='inquilino', log_queries=True)
 def listar_inquilinos():
     """
-    Muestra la lista de todos los inquilinos.
+    Lista inquilinos filtrados automáticamente por propietario activo.
     """
-    inquilinos_list = []
     csrf_form = CSRFOnlyForm()
     try:
-        inquilinos_list = db.session.query(Inquilino) \
-            .order_by(Inquilino.nombre).all()
+        # Filtrado automático aplicado - solo inquilinos del propietario activo
+        inquilinos_list = get_filtered_inquilinos().order_by(Inquilino.nombre).all()
     except OperationalError:
         flash('Error de base de datos al cargar inquilinos.', 'danger')
+        inquilinos_list = []
     except Exception as e:
         flash(f'Error cargando inquilinos: {e}', 'danger')
+        inquilinos_list = []
     return render_template('inquilinos.html',
                            title='Inquilinos',
                            inquilinos=inquilinos_list,
                            csrf_form=csrf_form)
 
 @inquilinos_bp.route('/add', methods=['POST'])
-@role_required('admin', 'gestor') 
+@role_required('admin', 'gestor')
+@with_owner_filtering(require_active_owner=False) 
 def add_inquilino():
     """
     Añade un nuevo inquilino. Requiere campos en el form:
@@ -105,15 +116,15 @@ def add_inquilino():
 
 @inquilinos_bp.route('/edit/<int:id>', methods=['POST'])
 @role_required('admin', 'gestor')
+@validate_entity_access('inquilino', 'id')
 def edit_inquilino(id):
     """
-    Edita un inquilino existente. Requiere campos en el form:
-      - editTenantNombre, editTenantNIF, editTenantEmail, etc.
+    Edita un inquilino existente con validación automática de acceso.
     """
-    tenant = db.session.get(Inquilino, id)
+    # La validación de acceso ya se hizo automáticamente
+    tenant = OwnerFilteredQueries.get_inquilino_by_id(id)
     if not tenant:
-        flash('Inquilino no encontrado.', 'warning')
-        # abort(404)
+        flash('Inquilino no encontrado o sin acceso.', 'warning')
         return redirect(url_for('inquilinos_bp.listar_inquilinos'))
 
     if request.method == 'POST':
@@ -164,11 +175,13 @@ def edit_inquilino(id):
 
 @inquilinos_bp.route('/delete/<int:id>', methods=['POST'])
 @role_required('admin', 'gestor')
+@validate_entity_access('inquilino', 'id')
 def delete_inquilino(id):
-    """Elimina un inquilino si no tiene contratos/facturas."""
-    tenant = db.session.get(Inquilino, id)
+    """Elimina un inquilino con validación automática de acceso."""
+    # La validación de acceso ya se hizo automáticamente
+    tenant = OwnerFilteredQueries.get_inquilino_by_id(id)
     if not tenant:
-        flash('Inquilino no encontrado.', 'warning')
+        flash('Inquilino no encontrado o sin acceso.', 'warning')
         return redirect(url_for('inquilinos_bp.listar_inquilinos'))
 
     # --- Verificación de Permiso (similar a editar) ---

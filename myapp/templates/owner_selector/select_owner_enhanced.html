@@ -1,0 +1,438 @@
+{% extends "base.html" %}
+
+{% block title %}Seleccionar Propietario - RentalSYS{% endblock %}
+
+{% block content %}
+<div class="container mx-auto mt-8 px-4 pb-8">
+    <!-- Header Section -->
+    <div class="text-center mb-8">
+        <div class="mb-4">
+            <div class="w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i class="fas fa-users text-white text-3xl"></i>
+            </div>
+            <h1 class="text-3xl font-bold text-gray-800 dark:text-white mb-2">Seleccionar Propietario</h1>
+            <p class="text-gray-600 dark:text-gray-400">Elige el propietario con el que deseas trabajar</p>
+        </div>
+        
+        <!-- Current Owner Banner -->
+        {% if active_owner %}
+            <div class="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200 dark:border-blue-700 rounded-xl p-4 mb-6 max-w-2xl mx-auto">
+                <div class="flex items-center justify-center space-x-3">
+                    <div class="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center">
+                        <i class="fas fa-crown text-white"></i>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-sm font-medium text-blue-600 dark:text-blue-400">Propietario Activo Actual</div>
+                        <div class="font-bold text-blue-800 dark:text-blue-200">{{ active_owner.nombre }}</div>
+                        <div class="text-xs text-blue-600 dark:text-blue-400">{{ active_owner.nif }}</div>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+
+    {% if available_owners|length == 0 %}
+        <!-- No Owners Available -->
+        <div class="max-w-md mx-auto">
+            <div class="bg-gradient-to-br from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 border border-yellow-200 dark:border-yellow-700 rounded-2xl p-8 text-center">
+                <div class="w-20 h-20 bg-yellow-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <i class="fas fa-exclamation-triangle text-white text-3xl"></i>
+                </div>
+                <h3 class="text-xl font-bold text-yellow-800 dark:text-yellow-200 mb-4">Sin Propietarios Asignados</h3>
+                <p class="text-yellow-700 dark:text-yellow-300 mb-6">No tienes propietarios asignados. Contacta con el administrador para obtener acceso.</p>
+                <a href="{{ url_for('main_bp.dashboard') }}" class="bg-yellow-500 hover:bg-yellow-600 text-white px-6 py-3 rounded-xl transition-colors font-medium">
+                    <i class="fas fa-arrow-left mr-2"></i> Volver al Dashboard
+                </a>
+            </div>
+        </div>
+        
+    {% elif available_owners|length == 1 %}
+        <!-- Single Owner Auto-select -->
+        <div class="max-w-md mx-auto">
+            <div class="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border border-green-200 dark:border-green-700 rounded-2xl p-8 text-center">
+                <div class="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <i class="fas fa-check-circle text-white text-3xl"></i>
+                </div>
+                <h3 class="text-xl font-bold text-green-800 dark:text-green-200 mb-4">Propietario Único Detectado</h3>
+                <p class="text-green-700 dark:text-green-300 mb-6">Se seleccionará automáticamente: <strong>{{ available_owners[0].nombre }}</strong></p>
+                <form method="POST" class="space-y-4">
+                    <input type="hidden" name="propietario_id" value="{{ available_owners[0].id }}">
+                    {% if next_url %}
+                        <input type="hidden" name="next" value="{{ next_url }}">
+                    {% endif %}
+                    <button type="submit" class="bg-green-500 hover:bg-green-600 text-white px-8 py-3 rounded-xl text-lg font-semibold transition-colors">
+                        <i class="fas fa-check mr-2"></i> Continuar
+                    </button>
+                </form>
+            </div>
+        </div>
+    
+    {% else %}
+        <!-- Multiple Owners Selection -->
+        <div class="max-w-6xl mx-auto">
+            <!-- Search and Filter Section -->
+            <div class="mb-8">
+                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6">
+                    <div class="flex flex-col md:flex-row gap-4">
+                        <div class="flex-1">
+                            <label for="ownerSearch" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                <i class="fas fa-search mr-2"></i>Buscar propietario
+                            </label>
+                            <input type="text" 
+                                   id="ownerSearch" 
+                                   placeholder="Buscar por nombre, NIF o ciudad..."
+                                   class="form-input w-full">
+                        </div>
+                        <div class="md:w-48">
+                            <label for="ownerSort" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                <i class="fas fa-sort mr-2"></i>Ordenar por
+                            </label>
+                            <select id="ownerSort" class="form-input w-full">
+                                <option value="name">Nombre</option>
+                                <option value="properties">Propiedades</option>
+                                <option value="contracts">Contratos</option>
+                                <option value="city">Ciudad</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Owner Selection Form -->
+            <form method="POST" id="ownerSelectionForm">
+                {% if next_url %}
+                    <input type="hidden" name="next" value="{{ next_url }}">
+                {% endif %}
+                
+                <!-- Owners Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8" id="ownersGrid">
+                    {% for propietario in available_owners %}
+                        <div class="owner-card" 
+                             data-name="{{ propietario.nombre|lower }}"
+                             data-nif="{{ propietario.nif|lower }}"
+                             data-city="{{ propietario.ciudad|lower if propietario.ciudad else '' }}"
+                             data-properties="{{ propietario.propiedades|length }}"
+                             data-contracts="0">
+                            
+                            <input type="radio" 
+                                   name="propietario_id" 
+                                   value="{{ propietario.id }}" 
+                                   id="owner_{{ propietario.id }}"
+                                   class="sr-only owner-radio"
+                                   {% if active_owner and active_owner.id == propietario.id %}checked{% endif %}>
+                            
+                            <label for="owner_{{ propietario.id }}" class="block cursor-pointer h-full">
+                                <div class="bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600 rounded-2xl p-6 hover:border-blue-400 hover:shadow-lg transition-all duration-300 owner-card-border h-full flex flex-col">
+                                    
+                                    <!-- Header with Avatar -->
+                                    <div class="flex items-center space-x-4 mb-4">
+                                        <div class="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center relative">
+                                            <i class="fas fa-user-tie text-white text-2xl"></i>
+                                            <div class="owner-check absolute -top-2 -right-2">
+                                                <div class="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center hidden">
+                                                    <i class="fas fa-check text-white text-sm"></i>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="flex-1">
+                                            <h3 class="font-bold text-gray-800 dark:text-gray-200 text-lg mb-1">{{ propietario.nombre }}</h3>
+                                            <p class="text-sm text-gray-600 dark:text-gray-400 flex items-center">
+                                                <i class="fas fa-id-card mr-2"></i> {{ propietario.nif }}
+                                            </p>
+                                            {% if propietario.ciudad %}
+                                                <p class="text-sm text-gray-600 dark:text-gray-400 flex items-center mt-1">
+                                                    <i class="fas fa-map-marker-alt mr-2"></i> {{ propietario.ciudad }}
+                                                </p>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+
+                                    <!-- Statistics -->
+                                    <div class="grid grid-cols-2 gap-4 mb-4 flex-1">
+                                        <div class="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 text-center">
+                                            <div class="text-2xl font-bold text-blue-600 dark:text-blue-400">{{ propietario.propiedades|length }}</div>
+                                            <div class="text-xs text-blue-600 dark:text-blue-400 font-medium">Propiedades</div>
+                                        </div>
+                                        <div class="bg-green-50 dark:bg-green-900/20 rounded-lg p-3 text-center">
+                                            <div class="text-2xl font-bold text-green-600 dark:text-green-400">0</div>
+                                            <div class="text-xs text-green-600 dark:text-green-400 font-medium">Contratos</div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Contact Info -->
+                                    {% if propietario.telefono or propietario.email %}
+                                        <div class="border-t border-gray-200 dark:border-gray-600 pt-4 space-y-2">
+                                            {% if propietario.telefono %}
+                                                <div class="flex items-center text-sm text-gray-600 dark:text-gray-400">
+                                                    <i class="fas fa-phone mr-2 text-blue-500"></i>
+                                                    {{ propietario.telefono }}
+                                                </div>
+                                            {% endif %}
+                                            {% if propietario.email %}
+                                                <div class="flex items-center text-sm text-gray-600 dark:text-gray-400">
+                                                    <i class="fas fa-envelope mr-2 text-blue-500"></i>
+                                                    {{ propietario.email }}
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                    {% endif %}
+
+                                    <!-- Selection Indicator -->
+                                    <div class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
+                                        <div class="flex items-center justify-center text-sm font-medium text-gray-500 dark:text-gray-400 owner-status">
+                                            <i class="fas fa-circle mr-2"></i>
+                                            Clic para seleccionar
+                                        </div>
+                                    </div>
+                                </div>
+                            </label>
+                        </div>
+                    {% endfor %}
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                    <a href="{{ url_for('main_bp.dashboard') }}" class="bg-gray-500 hover:bg-gray-600 text-white px-8 py-3 rounded-xl transition-colors text-center font-medium">
+                        <i class="fas fa-times mr-2"></i> Cancelar
+                    </a>
+                    <button type="submit" class="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white px-8 py-3 rounded-xl transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed" id="submitBtn" disabled>
+                        <i class="fas fa-check mr-2"></i> Seleccionar Propietario
+                    </button>
+                </div>
+            </form>
+        </div>
+    {% endif %}
+</div>
+
+<style>
+/* Estilos para las tarjetas de propietarios */
+.owner-card input[type="radio"]:checked + label .owner-card-border {
+    border-color: #3b82f6;
+    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+    box-shadow: 0 10px 25px -3px rgba(59, 130, 246, 0.1), 0 4px 6px -2px rgba(59, 130, 246, 0.05);
+    transform: translateY(-2px);
+}
+
+.dark .owner-card input[type="radio"]:checked + label .owner-card-border {
+    border-color: #60a5fa;
+    background: linear-gradient(135deg, #1e3a8a20 0%, #1e40af30 100%);
+    box-shadow: 0 10px 25px -3px rgba(96, 165, 250, 0.2), 0 4px 6px -2px rgba(96, 165, 250, 0.1);
+}
+
+.owner-card input[type="radio"]:checked + label .owner-check > div {
+    display: flex !important;
+}
+
+.owner-card input[type="radio"]:checked + label .owner-status {
+    color: #3b82f6;
+}
+
+.owner-card input[type="radio"]:checked + label .owner-status i {
+    color: #10b981;
+}
+
+.dark .owner-card input[type="radio"]:checked + label .owner-status {
+    color: #60a5fa;
+}
+
+/* Animaciones y transiciones */
+.owner-card-border {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.owner-card:hover .owner-card-border {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+/* Efectos de búsqueda */
+.owner-card.hidden {
+    display: none;
+}
+
+.owner-card.filtered {
+    opacity: 0.3;
+    pointer-events: none;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('ownerSelectionForm');
+    const submitBtn = document.getElementById('submitBtn');
+    const radioButtons = document.querySelectorAll('input[name="propietario_id"]');
+    const searchInput = document.getElementById('ownerSearch');
+    const sortSelect = document.getElementById('ownerSort');
+    const ownersGrid = document.getElementById('ownersGrid');
+    
+    // Funcionalidad de selección
+    if (form && submitBtn && radioButtons.length > 0) {
+        // Verificar si hay alguno seleccionado al cargar
+        const anyChecked = Array.from(radioButtons).some(radio => radio.checked);
+        submitBtn.disabled = !anyChecked;
+        
+        // Agregar listener a cada radio button
+        radioButtons.forEach(radio => {
+            radio.addEventListener('change', function() {
+                submitBtn.disabled = false;
+                updateSelectionDisplay();
+            });
+        });
+        
+        // Prevenir envío si no hay selección
+        form.addEventListener('submit', function(e) {
+            const selected = document.querySelector('input[name="propietario_id"]:checked');
+            if (!selected) {
+                e.preventDefault();
+                showNotification('Debes seleccionar un propietario antes de continuar.', 'error');
+            }
+        });
+    }
+
+    // Funcionalidad de búsqueda
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            filterOwners();
+        });
+    }
+
+    // Funcionalidad de ordenamiento
+    if (sortSelect) {
+        sortSelect.addEventListener('change', function() {
+            sortOwners();
+        });
+    }
+
+    // Actualizar display de selección
+    function updateSelectionDisplay() {
+        radioButtons.forEach(radio => {
+            const ownerStatus = radio.closest('.owner-card').querySelector('.owner-status');
+            if (radio.checked) {
+                ownerStatus.innerHTML = '<i class="fas fa-check-circle mr-2"></i>Seleccionado';
+                ownerStatus.classList.add('text-blue-600', 'dark:text-blue-400');
+                ownerStatus.classList.remove('text-gray-500', 'dark:text-gray-400');
+            } else {
+                ownerStatus.innerHTML = '<i class="fas fa-circle mr-2"></i>Clic para seleccionar';
+                ownerStatus.classList.remove('text-blue-600', 'dark:text-blue-400');
+                ownerStatus.classList.add('text-gray-500', 'dark:text-gray-400');
+            }
+        });
+    }
+
+    // Filtrar propietarios
+    function filterOwners() {
+        const searchTerm = searchInput.value.toLowerCase();
+        const ownerCards = document.querySelectorAll('.owner-card');
+        
+        ownerCards.forEach(card => {
+            const name = card.dataset.name || '';
+            const nif = card.dataset.nif || '';
+            const city = card.dataset.city || '';
+            
+            const matches = name.includes(searchTerm) || 
+                           nif.includes(searchTerm) || 
+                           city.includes(searchTerm);
+            
+            if (matches || searchTerm === '') {
+                card.classList.remove('hidden');
+            } else {
+                card.classList.add('hidden');
+            }
+        });
+    }
+
+    // Ordenar propietarios
+    function sortOwners() {
+        const sortBy = sortSelect.value;
+        const ownerCards = Array.from(document.querySelectorAll('.owner-card'));
+        
+        ownerCards.sort((a, b) => {
+            let aValue, bValue;
+            
+            switch(sortBy) {
+                case 'name':
+                    aValue = a.dataset.name;
+                    bValue = b.dataset.name;
+                    break;
+                case 'properties':
+                    aValue = parseInt(a.dataset.properties);
+                    bValue = parseInt(b.dataset.properties);
+                    return bValue - aValue; // Descendente
+                case 'contracts':
+                    aValue = parseInt(a.dataset.contracts);
+                    bValue = parseInt(b.dataset.contracts);
+                    return bValue - aValue; // Descendente
+                case 'city':
+                    aValue = a.dataset.city;
+                    bValue = b.dataset.city;
+                    break;
+                default:
+                    return 0;
+            }
+            
+            if (typeof aValue === 'string') {
+                return aValue.localeCompare(bValue);
+            }
+            return aValue - bValue;
+        });
+        
+        // Reordenar en el DOM
+        ownerCards.forEach(card => {
+            ownersGrid.appendChild(card);
+        });
+    }
+
+    // Función para mostrar notificaciones
+    function showNotification(message, type = 'success') {
+        let notificationContainer = document.getElementById('notificationContainer');
+        if (!notificationContainer) {
+            notificationContainer = document.createElement('div');
+            notificationContainer.id = 'notificationContainer';
+            notificationContainer.className = 'fixed top-4 right-4 z-50 space-y-3';
+            document.body.appendChild(notificationContainer);
+        }
+        
+        const notificationId = 'notification-' + Date.now();
+        const colorClasses = type === 'success' 
+            ? 'bg-gradient-to-r from-green-500 to-emerald-500' 
+            : 'bg-gradient-to-r from-red-500 to-rose-500';
+        
+        const notificationHtml = `
+            <div id="${notificationId}" class="${colorClasses} text-white px-6 py-4 rounded-xl shadow-2xl transform transition-all duration-300 translate-x-full opacity-0">
+                <div class="flex items-center justify-between">
+                    <span class="font-medium">${message}</span>
+                    <button onclick="removeNotification('${notificationId}')" class="ml-4 text-white/80 hover:text-white">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        notificationContainer.insertAdjacentHTML('beforeend', notificationHtml);
+        const notificationElement = document.getElementById(notificationId);
+        
+        setTimeout(() => {
+            notificationElement.classList.remove('translate-x-full', 'opacity-0');
+        }, 100);
+        
+        setTimeout(() => {
+            removeNotification(notificationId);
+        }, 5000);
+    }
+
+    // Función global para remover notificaciones
+    window.removeNotification = function(notificationId) {
+        const notification = document.getElementById(notificationId);
+        if (notification) {
+            notification.classList.add('translate-x-full', 'opacity-0');
+            setTimeout(() => {
+                notification.remove();
+            }, 300);
+        }
+    };
+
+    // Inicializar display
+    updateSelectionDisplay();
+});
+</script>
+{% endblock %}

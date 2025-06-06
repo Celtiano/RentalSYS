@@ -765,21 +765,29 @@
             <nav class="flex-1 overflow-y-auto custom-scrollbar">
                 <div class="p-2 sm:p-3">
                     
-                    {# Menú Principal #}
+                    {# Menú Principal - Dinámico según propietario activo #}
                     <div class="mb-6">
                         <h2 class="flex items-center text-xs uppercase font-bold text-blue-200/70 mb-3 px-3 sidebar-section-title tracking-wider">
                             <i class="fas fa-layer-group mr-2 text-blue-300/50"></i>
                             <span>Principal</span>
-                            <span class="ml-auto text-xs bg-blue-700/30 px-2 py-0.5 rounded-full">6</span>
+                            {% if active_owner %}
+                                <span class="ml-auto text-xs bg-green-700/50 px-2 py-0.5 rounded-full border border-green-400/30">Filtrado</span>
+                            {% else %}
+                                <span class="ml-auto text-xs bg-blue-700/30 px-2 py-0.5 rounded-full">Global</span>
+                            {% endif %}
                         </h2>
                         <ul class="space-y-1">
                             {# Dashboard #}
                             <li>
-                                <a href="{{ url_for('main_bp.dashboard') }}" title="Dashboard" 
+                                <a href="{{ url_for('main_bp.dashboard') }}" 
+                                   title="{% if active_owner %}Dashboard de {{ active_owner.nombre }}{% else %}Dashboard global de todos los propietarios{% endif %}" 
                                    class="sidebar-link flex items-center p-2.5 rounded-lg transition-all duration-200 text-sm sm:text-base relative group
                                           {% if request.endpoint == 'main_bp.dashboard' %}sidebar-active bg-white/20 shadow-md{% else %}hover:bg-white/10{% endif %}">
                                     <i class="fas fa-tachometer-alt mr-3 w-5 text-center sidebar-icon {% if request.endpoint == 'main_bp.dashboard' %}text-yellow-300{% endif %}"></i>
                                     <span class="whitespace-nowrap sidebar-item-text font-medium">Dashboard</span>
+                                    {% if active_owner %}
+                                        <i class="fas fa-user-check ml-auto text-green-400 text-xs sidebar-item-text opacity-70"></i>
+                                    {% endif %}
                                     {% if request.endpoint == 'main_bp.dashboard' %}
                                     <span class="absolute right-0 top-0 bottom-0 w-1 bg-yellow-400 rounded-r-lg"></span>
                                     {% endif %}
@@ -789,43 +797,62 @@
                             {# Generar Facturas (Destacado) #}
                             <li>
                                 <a href="{{ url_for('facturas_bp.generar_facturas_mes') }}" 
-                                   title="Generar Facturas" 
+                                   title="{% if active_owner %}Generar facturas solo para {{ active_owner.nombre }}{% else %}Generar facturas para todos los propietarios{% endif %}" 
                                    class="generar-facturas-destacado flex items-center p-3 rounded-lg transition-all duration-300 text-sm sm:text-base relative overflow-hidden group
                                           {% if request.endpoint == 'facturas_bp.generar_facturas_mes' %}ring-2 ring-green-400/50{% endif %}">
                                     <div class="absolute inset-0 bg-gradient-to-r from-green-600/20 to-green-500/20 animate-pulse"></div>
                                     <i class="fas fa-magic generar-facturas-icon mr-3 w-5 text-center sidebar-icon relative z-10"></i>
-                                    <span class="whitespace-nowrap sidebar-item-text generar-facturas-text relative z-10">Generar Facturas</span>
+                                    <div class="flex flex-col sidebar-item-text generar-facturas-text relative z-10">
+                                        <span class="whitespace-nowrap">Generar Facturas</span>
+                                        {% if active_owner %}
+                                            <span class="text-xs opacity-80 font-normal">{{ active_owner.nombre.split()[0] if active_owner.nombre.split() else 'Propietario' }}</span>
+                                        {% else %}
+                                            <span class="text-xs opacity-80 font-normal">Todos</span>
+                                        {% endif %}
+                                    </div>
                                     <i class="fas fa-bolt ml-auto text-yellow-300 text-xs sidebar-item-text animate-pulse"></i>
                                 </a>
                             </li>
                             
-                            {# Lista Facturas #}
+                            {# Lista Facturas - Solo visible con propietario seleccionado #}
+                            {% if active_owner %}
                             <li>
-                                <a href="{{ url_for('facturas_bp.listar_facturas') }}" title="Lista Facturas" 
+                                <a href="{{ url_for('facturas_bp.listar_facturas') }}" 
+                                   title="Facturas de {{ active_owner.nombre }}" 
                                    class="sidebar-link flex items-center p-2.5 rounded-lg transition-all duration-200 text-sm sm:text-base group
                                           {% if request.endpoint == 'facturas_bp.listar_facturas' %}sidebar-active bg-white/20{% else %}hover:bg-white/10{% endif %}">
                                     <i class="fas fa-file-invoice mr-3 w-5 text-center sidebar-icon"></i>
                                     <span class="whitespace-nowrap sidebar-item-text">Lista Facturas</span>
+                                    <i class="fas fa-filter ml-auto text-green-400 text-xs sidebar-item-text opacity-70"></i>
                                 </a>
                             </li>
+                            {% endif %}
                             
-                            {# Borrado Masivo #}
+                            {# Borrado Masivo de Facturas #}
                             <li>
-                                <a href="{{ url_for('facturas_bp.borrar_facturas_masivo') }}" title="Borrar Facturas Masivo"
+                                <a href="{{ url_for('facturas_bp.borrar_facturas_masivo') }}" 
+                                   title="{% if active_owner %}Borrar facturas de {{ active_owner.nombre }} (propietario preseleccionado){% else %}Borrar facturas de cualquier propietario{% endif %}"
                                    class="sidebar-link flex items-center p-2.5 rounded-lg transition-all duration-200 text-sm sm:text-base group
                                           {% if request.endpoint == 'facturas_bp.borrar_facturas_masivo' %}sidebar-active bg-white/20{% else %}hover:bg-white/10{% endif %}">
                                     <i class="fas fa-trash-alt mr-3 w-5 text-center sidebar-icon"></i>
                                     <span class="whitespace-nowrap sidebar-item-text">Borrado Masivo</span>
+                                    {% if active_owner %}
+                                        <i class="fas fa-lock ml-auto text-green-400 text-xs sidebar-item-text opacity-70" title="Propietario preseleccionado"></i>
+                                    {% endif %}
                                 </a>
                             </li>
                             
-                            {# Envío Masivo #}
+                            {# Envío Masivo de Facturas #}
                             <li>
-                                <a href="{{ url_for('facturas_bp.enviar_facturas_masivo') }}" title="Envío Masivo Emails" 
+                                <a href="{{ url_for('facturas_bp.enviar_facturas_masivo') }}" 
+                                   title="{% if active_owner %}Enviar facturas solo de {{ active_owner.nombre }}{% else %}Enviar facturas de cualquier propietario{% endif %}" 
                                    class="sidebar-link flex items-center p-2.5 rounded-lg transition-all duration-200 text-sm sm:text-base group
                                           {% if request.endpoint == 'facturas_bp.enviar_facturas_masivo' %}sidebar-active bg-white/20{% else %}hover:bg-white/10{% endif %}">
                                     <i class="fas fa-paper-plane mr-3 w-5 text-center sidebar-icon"></i>
                                     <span class="whitespace-nowrap sidebar-item-text">Envío Masivo</span>
+                                    {% if active_owner %}
+                                        <i class="fas fa-user-check ml-auto text-green-400 text-xs sidebar-item-text opacity-70"></i>
+                                    {% endif %}
                                 </a>
                             </li>
                             
@@ -841,60 +868,80 @@
                         </ul>
                     </div>
                     
-                    {# Menú Gestión #}
+                    {# Menú Gestión - Dinámico según propietario activo #}
                     <div class="mb-6">
                         <h2 class="flex items-center text-xs uppercase font-bold text-blue-200/70 mb-3 px-3 sidebar-section-title tracking-wider">
                             <i class="fas fa-cogs mr-2 text-blue-300/50"></i>
                             <span>Gestión</span>
-                            <span class="ml-auto text-xs bg-blue-700/30 px-2 py-0.5 rounded-full">6</span>
+                            {% if active_owner %}
+                                <span class="ml-auto text-xs bg-green-700/50 px-2 py-0.5 rounded-full border border-green-400/30">{{ active_owner.nombre.split()[0] if active_owner.nombre.split() else 'Filtrado' }}</span>
+                            {% else %}
+                                <span class="ml-auto text-xs bg-blue-700/30 px-2 py-0.5 rounded-full">6</span>
+                            {% endif %}
                         </h2>
                         <ul class="space-y-1">
-                            {# Propietarios #}
+                            {# Propietarios - Siempre visible #}
                             <li>
-                                <a href="{{ url_for('propietarios_bp.listar_propietarios') }}" title="Propietarios" 
+                                <a href="{{ url_for('propietarios_bp.listar_propietarios') }}" 
+                                   title="Gestión de propietarios{% if active_owner %} (Activo: {{ active_owner.nombre }}){% endif %}" 
                                    class="sidebar-link flex items-center p-2.5 rounded-lg transition-all duration-200 text-sm sm:text-base group
                                           {% if request.endpoint.startswith('propietarios_bp.') %}sidebar-active bg-white/20{% else %}hover:bg-white/10{% endif %}">
                                     <i class="fas fa-user-tie mr-3 w-5 text-center sidebar-icon"></i>
                                     <span class="sidebar-item-text">Propietarios</span>
                                     {% if request.endpoint.startswith('propietarios_bp.') %}
-                                    <span class="ml-auto w-2 h-2 bg-blue-400 rounded-full sidebar-item-text"></span>
+                                        <span class="ml-auto w-2 h-2 bg-blue-400 rounded-full sidebar-item-text"></span>
+                                    {% elif active_owner %}
+                                        <i class="fas fa-star ml-auto text-yellow-400 text-xs sidebar-item-text opacity-70"></i>
                                     {% endif %}
                                 </a>
                             </li>
-                            
-                            {# Inquilinos #}
+
+                            {# Propiedades - Solo visible con propietario seleccionado #}
+                            {% if active_owner %}
                             <li>
-                                <a href="{{ url_for('inquilinos_bp.listar_inquilinos') }}" title="Inquilinos" 
-                                   class="sidebar-link flex items-center p-2.5 rounded-lg transition-all duration-200 text-sm sm:text-base group
-                                          {% if request.endpoint.startswith('inquilinos_bp.') %}sidebar-active bg-white/20{% else %}hover:bg-white/10{% endif %}">
-                                    <i class="fas fa-users mr-3 w-5 text-center sidebar-icon"></i>
-                                    <span class="sidebar-item-text">Inquilinos</span>
-                                </a>
-                            </li>
-                            
-                            {# Propiedades #}
-                            <li>
-                                <a href="{{ url_for('propiedades_bp.listar_propiedades') }}" title="Propiedades" 
+                                <a href="{{ url_for('propiedades_bp.listar_propiedades') }}" 
+                                   title="Propiedades de {{ active_owner.nombre }}" 
                                    class="sidebar-link flex items-center p-2.5 rounded-lg transition-all duration-200 text-sm sm:text-base group
                                           {% if request.endpoint.startswith('propiedades_bp.') %}sidebar-active bg-white/20{% else %}hover:bg-white/10{% endif %}">
                                     <i class="fas fa-home mr-3 w-5 text-center sidebar-icon"></i>
                                     <span class="sidebar-item-text">Propiedades</span>
+                                    <i class="fas fa-filter ml-auto text-green-400 text-xs sidebar-item-text opacity-70"></i>
                                 </a>
                             </li>
+                            {% endif %}
                             
-                            {# Contratos #}
+                            {# Inquilinos - Solo visible con propietario seleccionado #}
+                            {% if active_owner %}
                             <li>
-                                <a href="{{ url_for('contratos_bp.listar_contratos') }}" title="Contratos" 
+                                <a href="{{ url_for('inquilinos_bp.listar_inquilinos') }}" 
+                                   title="Inquilinos vinculados a {{ active_owner.nombre }}" 
+                                   class="sidebar-link flex items-center p-2.5 rounded-lg transition-all duration-200 text-sm sm:text-base group
+                                          {% if request.endpoint.startswith('inquilinos_bp.') %}sidebar-active bg-white/20{% else %}hover:bg-white/10{% endif %}">
+                                    <i class="fas fa-users mr-3 w-5 text-center sidebar-icon"></i>
+                                    <span class="sidebar-item-text">Inquilinos</span>
+                                    <i class="fas fa-link ml-auto text-green-400 text-xs sidebar-item-text opacity-70"></i>
+                                </a>
+                            </li>
+                            {% endif %}
+                            
+                            {# Contratos - Solo visible con propietario seleccionado #}
+                            {% if active_owner %}
+                            <li>
+                                <a href="{{ url_for('contratos_bp.listar_contratos') }}" 
+                                   title="Contratos de {{ active_owner.nombre }}" 
                                    class="sidebar-link flex items-center p-2.5 rounded-lg transition-all duration-200 text-sm sm:text-base group
                                           {% if request.endpoint.startswith('contratos_bp.') %}sidebar-active bg-white/20{% else %}hover:bg-white/10{% endif %}">
                                     <i class="fas fa-file-contract mr-3 w-5 text-center sidebar-icon"></i>
                                     <span class="sidebar-item-text">Contratos</span>
+                                    <i class="fas fa-filter ml-auto text-green-400 text-xs sidebar-item-text opacity-70"></i>
                                 </a>
                             </li>
+                            {% endif %}
                             
-                            {# Gestión Índices #}
+                            {# Gestión Índices - Siempre visible #}
                             <li>
-                                <a href="{{ url_for('ipc_bp.listar_indices') }}" title="Gestión Índices" 
+                                <a href="{{ url_for('ipc_bp.listar_indices') }}" 
+                                   title="Gestión de Índices (global para todos los propietarios)" 
                                    class="sidebar-link flex items-center p-2.5 rounded-lg transition-all duration-200 text-sm sm:text-base group
                                           {% if request.endpoint.startswith('ipc_bp.') %}sidebar-active bg-white/20{% else %}hover:bg-white/10{% endif %}">
                                     <i class="fas fa-chart-line mr-3 w-5 text-center sidebar-icon"></i>
@@ -904,15 +951,49 @@
                             
                             {# Exportar Facturas #}
                             <li>
-                                <a href="{{ url_for('reports_bp.exportar_facturas_csv') }}" title="Exportar Facturas"
+                                <a href="{{ url_for('reports_bp.index') }}" 
+                                   title="{% if active_owner %}Exportar facturas de {{ active_owner.nombre }} (propietario preseleccionado){% else %}Exportar facturas de cualquier propietario{% endif %}"
                                    class="sidebar-link flex items-center p-2.5 rounded-lg transition-all duration-200 text-sm sm:text-base group
                                           {% if request.endpoint.startswith('reports_bp.') %}sidebar-active bg-white/20{% else %}hover:bg-white/10{% endif %}">
                                     <i class="fas fa-file-export mr-3 w-5 text-center sidebar-icon"></i>
                                     <span class="whitespace-nowrap sidebar-item-text">Exportar Facturas</span>
+                                    {% if active_owner %}
+                                        <i class="fas fa-lock ml-auto text-green-400 text-xs sidebar-item-text opacity-70" title="Propietario preseleccionado"></i>
+                                    {% endif %}
                                 </a>
                             </li>
                         </ul>
                     </div>
+                    
+                    {# Menú Informes y Exportaciones #}
+                    {% if current_user.role in ['admin', 'gestor'] %}
+                    <div class="mb-6">
+                        <h2 class="flex items-center text-xs uppercase font-bold text-blue-200/70 mb-3 px-3 sidebar-section-title tracking-wider">
+                            <i class="fas fa-chart-bar mr-2 text-purple-300/50"></i>
+                            <span>Informes</span>
+                            {% if active_owner %}
+                                <span class="ml-auto text-xs bg-purple-700/50 px-2 py-0.5 rounded-full border border-purple-400/30">Filtrado</span>
+                            {% else %}
+                                <span class="ml-auto text-xs bg-purple-700/30 px-2 py-0.5 rounded-full">Global</span>
+                            {% endif %}
+                        </h2>
+                        <ul class="space-y-1">
+                            {# Informes y Exportaciones #}
+                            <li>
+                                <a href="{{ url_for('reports_bp.index') }}" 
+                                   title="{% if active_owner %}Informes filtrados por {{ active_owner.nombre }}{% else %}Informes globales de todos los propietarios{% endif %}" 
+                                   class="sidebar-link flex items-center p-2.5 rounded-lg transition-all duration-200 text-sm sm:text-base group
+                                          {% if request.endpoint.startswith('reports_bp.') %}sidebar-active bg-white/20{% else %}hover:bg-white/10{% endif %}">
+                                    <i class="fas fa-file-excel mr-3 w-5 text-center sidebar-icon"></i>
+                                    <span class="whitespace-nowrap sidebar-item-text">Informes y Exportaciones</span>
+                                    {% if active_owner %}
+                                        <i class="fas fa-filter ml-auto text-purple-400 text-xs sidebar-item-text opacity-70"></i>
+                                    {% endif %}
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                    {% endif %}
                     
                     {# Menú Configuración y Administración #}
                     <div>
@@ -1010,10 +1091,17 @@
         {% if current_user.is_authenticated %}
             <header class="bg-white dark:bg-gray-800 shadow-sm print:hidden flex-shrink-0">
                 <div class="flex items-center justify-between px-4 sm:px-6 py-3">
-                    {# Título del Header #}
-                    <h1 class="text-xl sm:text-2xl font-semibold text-gray-800 dark:text-gray-100">
-                        {% block header_title %}{{ title | default('RentalSys') }}{% endblock %}
-                    </h1>
+                    <div class="flex-1 flex items-center justify-between">
+                        {# Título del Header #}
+                        <h1 class="text-xl sm:text-2xl font-semibold text-gray-800 dark:text-gray-100">
+                            {% block header_title %}{{ title | default('RentalSys') }}{% endblock %}
+                        </h1>
+                        
+                        {# Widget Selector de Propietario #}
+                        <div class="flex-1 max-w-2xl mx-4">
+                            {% include 'owner_selector/widget.html' %}
+                        </div>
+                    </div>
                      {# Iconos y Menú Usuario #}
                     <div class="flex items-center space-x-3 sm:space-x-4">
                         {# Notificaciones #}
@@ -1451,6 +1539,9 @@
 
 {# --- Bloque para scripts específicos de cada página --- #}
 {% block scripts %}{% endblock %}
+
+{# --- Modal de Cambio de Propietario --- #}
+{% include 'partials/_owner_modal.html' %}
 
 </body>
 </html>

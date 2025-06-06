@@ -8,6 +8,12 @@ from ..decorators import role_required, owner_access_required # Importar decorad
 # --------------------
 from ..models import db, Propietario, Propiedad # Importar Propiedad para la comprobación de borrado
 from ..forms import PropietarioForm, CSRFOnlyForm # Importar formulario
+from ..utils.owner_session import (
+    set_active_owner, 
+    get_active_owner, 
+    get_user_available_owners,
+    user_has_access_to_owner
+)
 
 propietarios_bp = Blueprint('propietarios_bp', __name__)
 
@@ -22,9 +28,32 @@ def propietarios_before_request(): # Renombrar para unicidad si es necesario
     #     return redirect(url_for('main_bp.dashboard'))
     pass
 
-# --- Listar Propietarios (con filtrado por rol) ---
-@propietarios_bp.route('/', methods=['GET'])
+# --- Listar Propietarios (con filtrado por rol) + Selector de Propietario Activo ---
+@propietarios_bp.route('/', methods=['GET', 'POST'])
 def listar_propietarios():
+    # Manejar selección de propietario activo
+    if request.method == 'POST':
+        action = request.form.get('action')
+        if action == 'select_owner':
+            propietario_id = request.form.get('propietario_id', type=int)
+            if propietario_id:
+                # Verificar que el usuario tiene acceso a este propietario
+                if user_has_access_to_owner(propietario_id):
+                    if set_active_owner(propietario_id):
+                        propietario = Propietario.query.get(propietario_id)
+                        flash(f"Propietario {propietario.nombre} seleccionado como activo.", "success")
+                        # Redirigir al dashboard o donde corresponda
+                        return redirect(url_for('main_bp.dashboard'))
+                    else:
+                        flash("Error al establecer el propietario activo.", "danger")
+                else:
+                    flash("No tienes acceso a este propietario.", "danger")
+            else:
+                flash("ID de propietario inválido.", "danger")
+            
+            # Redirigir de vuelta a la página de propietarios
+            return redirect(url_for('propietarios_bp.listar_propietarios'))
+    
     propietarios_list = []
     # Formulario para el modal de CREACIÓN.
     # El prefijo ayuda si se renderizan múltiples formularios o para validación específica.
@@ -58,11 +87,16 @@ def listar_propietarios():
         current_app.logger.error(f"Error general cargando propietarios: {e}", exc_info=True)
         propietarios_list = []
 
+    # Obtener información del propietario activo
+    active_owner = get_active_owner()
+    
     return render_template('propietarios.html',
                            title='Propietarios',
                            propietarios=propietarios_list,
                            form=form_create, # Para el modal de creación
-                           csrf_form=csrf_form_general) # Para otros modales (delete, y edit si no usa WTForm)
+                           csrf_form=csrf_form_general, # Para otros modales (delete, y edit si no usa WTForm)
+                           active_owner=active_owner,
+                           has_active_owner=active_owner is not None)
 
 
 # --- Añadir Propietario (Con lógica especial para gestor) ---

@@ -1,0 +1,265 @@
+{% extends "base.html" %}
+
+{% block title %}Listado de Facturación - {{ propietario.nombre }} - RentalSYS{% endblock %}
+
+{% block content %}
+<div class="container mx-auto mt-8 px-4 pb-8">
+    <!-- Header Section -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 mb-6">
+        <div class="bg-gradient-to-r from-green-500 to-green-600 p-6 rounded-t-xl">
+            <div class="flex items-center justify-between text-white">
+                <div class="flex items-center space-x-4">
+                    <div class="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
+                        <i class="fas fa-file-pdf text-xl"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-2xl font-bold">Listado de Facturación</h1>
+                        <p class="text-green-100">{{ propietario.nombre }}</p>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <div class="text-sm text-green-100">Período</div>
+                    <div class="text-lg font-bold">{{ fecha_desde.strftime('%d/%m/%Y') }} - {{ fecha_hasta.strftime('%d/%m/%Y') }}</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Información del propietario -->
+        <div class="p-6 border-b border-gray-200 dark:border-gray-600">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <div class="text-sm font-medium text-gray-500 dark:text-gray-400">NIF</div>
+                    <div class="text-lg font-bold text-gray-800 dark:text-gray-200">{{ propietario.nif }}</div>
+                </div>
+                <div>
+                    <div class="text-sm font-medium text-gray-500 dark:text-gray-400">Email</div>
+                    <div class="text-lg text-gray-800 dark:text-gray-200">{{ propietario.email or 'No especificado' }}</div>
+                </div>
+                <div>
+                    <div class="text-sm font-medium text-gray-500 dark:text-gray-400">Teléfono</div>
+                    <div class="text-lg text-gray-800 dark:text-gray-200">{{ propietario.telefono or 'No especificado' }}</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Acciones -->
+        <div class="p-6 bg-gray-50 dark:bg-gray-700 rounded-b-xl">
+            <div class="flex items-center justify-between">
+                <a href="{{ url_for('reports_bp.index') }}" 
+                   class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors">
+                    <i class="fas fa-arrow-left mr-2"></i>
+                    Volver a Informes
+                </a>
+                
+                <form action="{{ url_for('reports_bp.generar_pdf_facturacion') }}" method="POST" class="inline">
+                    {{ csrf_form.csrf_token }}
+                    <input type="hidden" name="propietario_id" value="{{ propietario.id }}">
+                    <input type="hidden" name="fecha_desde" value="{{ fecha_desde.strftime('%Y-%m-%d') }}">
+                    <input type="hidden" name="fecha_hasta" value="{{ fecha_hasta.strftime('%Y-%m-%d') }}">
+                    {% for contrato_id in facturas_por_contrato.keys() %}
+                        <input type="hidden" name="contrato_ids" value="{{ contrato_id }}">
+                    {% endfor %}
+                    
+                    <button type="submit" 
+                            class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors"
+                            title="Requiere librería reportlab">
+                        <i class="fas fa-file-pdf mr-2"></i>
+                        Generar PDF
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Listado por Contratos -->
+    {% for contrato_id, datos in facturas_por_contrato.items() %}
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 mb-6 overflow-hidden">
+            <!-- Header del Contrato -->
+            <div class="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 p-4 border-b border-gray-200 dark:border-gray-600">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-4">
+                        <div class="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center">
+                            <i class="fas fa-file-contract text-white text-sm"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-bold text-gray-800 dark:text-gray-200">
+                                Contrato {{ datos.contrato.numero_contrato or contrato_id }}
+                            </h3>
+                            <div class="text-sm text-gray-600 dark:text-gray-400">
+                                <span class="font-medium">{{ datos.contrato.inquilino_ref.nombre if datos.contrato.inquilino_ref else 'Sin inquilino' }}</span>
+                                <span class="mx-2">•</span>
+                                <span>{{ datos.contrato.propiedad_ref.direccion if datos.contrato.propiedad_ref else 'Sin propiedad' }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-sm text-gray-500 dark:text-gray-400">{{ datos.facturas|length }} facturas</div>
+                        <div class="text-lg font-bold text-blue-600 dark:text-blue-400">
+                            {{ "%.2f"|format(datos.totales.total) }} €
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabla de Facturas -->
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-600">
+                    <thead class="bg-gray-50 dark:bg-gray-700">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                Fecha
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                Nº Factura
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                NIF Inquilino
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                Nombre Inquilino
+                            </th>
+                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                Base Imponible
+                            </th>
+                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                Importe IVA
+                            </th>
+                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                Importe IRPF
+                            </th>
+                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                Total Factura
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-600">
+                        {% for factura in datos.facturas %}
+                            <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                                    {{ factura.fecha_emision.strftime('%d/%m/%Y') if factura.fecha_emision else '-' }}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
+                                    {{ factura.numero_factura or '-' }}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                                    {{ factura.contrato.inquilino_ref.nif if factura.contrato and factura.contrato.inquilino_ref else '-' }}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                                    {{ factura.contrato.inquilino_ref.nombre if factura.contrato and factura.contrato.inquilino_ref else '-' }}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100 text-right">
+                                    {{ "%.2f"|format(factura.importe_sin_iva or 0) }} €
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100 text-right">
+                                    {{ "%.2f"|format(factura.importe_iva or 0) }} €
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100 text-right">
+                                    {{ "%.2f"|format(factura.importe_irpf or 0) }} €
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100 text-right">
+                                    {{ "%.2f"|format(factura.importe_total or 0) }} €
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                    <!-- Totales del Contrato -->
+                    <tfoot class="bg-blue-50 dark:bg-blue-900/20">
+                        <tr>
+                            <td colspan="4" class="px-6 py-4 text-sm font-bold text-gray-800 dark:text-gray-200">
+                                TOTAL CONTRATO {{ datos.contrato.numero_contrato or contrato_id }}:
+                            </td>
+                            <td class="px-6 py-4 text-sm font-bold text-gray-800 dark:text-gray-200 text-right">
+                                {{ "%.2f"|format(datos.totales.base_imponible) }} €
+                            </td>
+                            <td class="px-6 py-4 text-sm font-bold text-gray-800 dark:text-gray-200 text-right">
+                                {{ "%.2f"|format(datos.totales.importe_iva) }} €
+                            </td>
+                            <td class="px-6 py-4 text-sm font-bold text-gray-800 dark:text-gray-200 text-right">
+                                {{ "%.2f"|format(datos.totales.importe_irpf) }} €
+                            </td>
+                            <td class="px-6 py-4 text-sm font-bold text-blue-600 dark:text-blue-400 text-right">
+                                {{ "%.2f"|format(datos.totales.total) }} €
+                            </td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    {% endfor %}
+
+    <!-- Totales Generales -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div class="bg-gradient-to-r from-purple-500 to-purple-600 p-4">
+            <h3 class="text-xl font-bold text-white flex items-center">
+                <i class="fas fa-calculator mr-3"></i>
+                Totales Generales
+            </h3>
+        </div>
+        <div class="p-6">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+                <div class="text-center">
+                    <div class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Base Imponible</div>
+                    <div class="text-2xl font-bold text-gray-800 dark:text-gray-200">
+                        {{ "%.2f"|format(totales_generales.base_imponible) }} €
+                    </div>
+                </div>
+                <div class="text-center">
+                    <div class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Importe IVA</div>
+                    <div class="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                        {{ "%.2f"|format(totales_generales.importe_iva) }} €
+                    </div>
+                </div>
+                <div class="text-center">
+                    <div class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Importe IRPF</div>
+                    <div class="text-2xl font-bold text-red-600 dark:text-red-400">
+                        {{ "%.2f"|format(totales_generales.importe_irpf) }} €
+                    </div>
+                </div>
+                <div class="text-center">
+                    <div class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Total General</div>
+                    <div class="text-3xl font-bold text-purple-600 dark:text-purple-400">
+                        {{ "%.2f"|format(totales_generales.total) }} €
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Información adicional -->
+    <div class="mt-6 text-center text-sm text-gray-500 dark:text-gray-400">
+        <p>Listado generado el {{ datetime.now().strftime('%d/%m/%Y a las %H:%M') }}</p>
+        <p>{{ facturas_por_contrato|length }} contratos • {{ facturas_por_contrato.values()|map(attribute='facturas')|map('length')|sum }} facturas</p>
+    </div>
+</div>
+
+<style>
+@media print {
+    .print\:hidden {
+        display: none !important;
+    }
+    
+    .container {
+        max-width: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    
+    .bg-gradient-to-r {
+        background: #6366f1 !important;
+        color: white !important;
+    }
+}
+</style>
+
+<script>
+// Función para imprimir (opcional)
+function printPage() {
+    window.print();
+}
+
+// Funcionalidad adicional si es necesaria
+document.addEventListener('DOMContentLoaded', function() {
+    // Aquí se puede agregar funcionalidad adicional
+});
+</script>
+{% endblock %}

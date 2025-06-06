@@ -1,0 +1,462 @@
+<!-- Widget de Selector de Propietario Activo - Versión Mejorada -->
+<style>
+#ownerDropdownMenu {
+    min-width: 320px !important;
+    max-width: 400px !important;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
+}
+</style>
+<div id="ownerSelectorWidget" class="bg-gradient-to-r from-blue-500 to-blue-600 dark:from-blue-700 dark:to-blue-800 rounded-xl shadow-lg border border-blue-200 dark:border-blue-600 overflow-visible mb-0">
+    {% if has_active_owner %}
+        <div class="p-4">
+            <div class="flex items-center justify-between">
+                <!-- Avatar y Info del Propietario -->
+                <div class="flex items-center space-x-3 flex-1 min-w-0">
+                    <div class="w-12 h-12 bg-white/20 dark:bg-white/10 rounded-full flex items-center justify-center ring-2 ring-white/30 flex-shrink-0">
+                        <i class="fas fa-user-tie text-white text-lg"></i>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="text-white/80 text-xs font-medium mb-1">
+                            <i class="fas fa-crown mr-1"></i>
+                            Propietario Activo
+                        </div>
+                        <div class="text-white font-bold text-sm truncate" title="{{ active_owner.nombre }}">
+                            {{ active_owner.nombre }}
+                        </div>
+                        <div class="text-white/70 text-xs">
+                            {{ active_owner.nif }}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Botones de Acción - Siempre visibles -->
+                <div class="flex items-center space-x-2 flex-shrink-0">
+                    <!-- Botón Cambiar Propietario -->
+                    <div class="relative">
+                        <button class="bg-white/20 hover:bg-white/30 text-white px-3 py-2 rounded-lg transition-all duration-200 hover:scale-105 dropdown-button flex items-center space-x-2" 
+                                type="button" 
+                                id="ownerDropdown"
+                                title="Cambiar propietario">
+                            <i class="fas fa-exchange-alt text-sm"></i>
+                            <span class="text-xs font-medium">Cambiar</span>
+                        </button>
+                            
+                            <!-- Dropdown Menu Mejorado -->
+                            <div class="fixed right-4 mt-2 w-80 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-600 z-[9999] hidden overflow-hidden" 
+                                 id="ownerDropdownMenu">
+                                <div class="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-700 dark:to-gray-600 px-4 py-3 border-b border-gray-200 dark:border-gray-600">
+                                    <h4 class="font-semibold text-gray-800 dark:text-white text-sm flex items-center">
+                                        <i class="fas fa-users mr-2 text-blue-500"></i>
+                                        Cambiar a otro propietario
+                                    </h4>
+                                </div>
+                                
+                                <div class="max-h-64 overflow-y-auto min-h-[100px]">
+                                    {% for owner in available_owners %}
+                                        {% if owner.id != active_owner.id %}
+                                            <a href="#" 
+                                               class="block px-4 py-3 hover:bg-blue-50 dark:hover:bg-gray-700 owner-change-link transition-colors border-b border-gray-100 dark:border-gray-600 last:border-b-0" 
+                                               data-owner-id="{{ owner.id }}"
+                                               data-owner-name="{{ owner.nombre }}">
+                                                <div class="flex items-center space-x-3">
+                                                    <div class="w-10 h-10 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-600 dark:to-gray-700 rounded-full flex items-center justify-center">
+                                                        <i class="fas fa-user-tie text-blue-500 text-sm"></i>
+                                                    </div>
+                                                    <div class="flex-1">
+                                                        <div class="font-medium text-gray-800 dark:text-white text-sm">{{ owner.nombre }}</div>
+                                                        <div class="text-xs text-gray-500 dark:text-gray-400">{{ owner.nif }}</div>
+                                                        {% if owner.ciudad %}
+                                                            <div class="text-xs text-gray-400 dark:text-gray-500">
+                                                                <i class="fas fa-map-marker-alt mr-1"></i>{{ owner.ciudad }}
+                                                            </div>
+                                                        {% endif %}
+                                                    </div>
+                                                    <div class="text-blue-500">
+                                                        <i class="fas fa-chevron-right text-xs"></i>
+                                                    </div>
+                                                </div>
+                                            </a>
+                                        {% endif %}
+                                    {% endfor %}
+                                </div>
+                                
+                                <div class="bg-gray-50 dark:bg-gray-700 px-4 py-3 border-t border-gray-200 dark:border-gray-600">
+                                    <a href="{{ url_for('owner_selector_bp.select_owner') }}" 
+                                       class="flex items-center justify-center w-full bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-lg text-sm transition-colors">
+                                        <i class="fas fa-cog mr-2"></i>
+                                        Gestión avanzada
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Botón Limpiar Propietario -->
+                        <button class="bg-red-500/30 hover:bg-red-500/50 text-white px-3 py-2 rounded-lg transition-all duration-200 hover:scale-105 flex items-center space-x-2" 
+                                type="button"
+                                id="clearOwnerButton"
+                                title="Cerrar propietario activo">
+                            <i class="fas fa-times text-sm"></i>
+                            <span class="text-xs font-medium">Cerrar</span>
+                        </button>
+                        
+                        <!-- Botón Info -->
+                        <button class="bg-white/20 hover:bg-white/30 text-white p-2 rounded-lg transition-all duration-200 hover:scale-105" 
+                                type="button"
+                                onclick="window.location.href='{{ url_for('owner_selector_bp.select_owner') }}'"
+                                title="Ver detalles del propietario">
+                            <i class="fas fa-info text-sm"></i>
+                        </button>
+                </div>
+            </div>
+        </div>
+    {% else %}
+        <div class="bg-gradient-to-r from-yellow-500 to-orange-500 p-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
+                        <i class="fas fa-exclamation-triangle text-white text-lg"></i>
+                    </div>
+                    <div>
+                        <div class="text-white font-semibold text-sm">Sin propietario activo</div>
+                        <div class="text-white/80 text-xs">Selecciona un propietario para continuar</div>
+                    </div>
+                </div>
+                <a href="{{ url_for('owner_selector_bp.select_owner') }}" 
+                   class="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg text-sm transition-all duration-200 hover:scale-105 flex items-center">
+                    <i class="fas fa-user-plus mr-2"></i>
+                    Seleccionar
+                </a>
+            </div>
+        </div>
+    {% endif %}
+</div>
+
+<!-- Modal de Confirmación para Cerrar Propietario -->
+<div id="confirmCloseOwnerModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 hidden">
+    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white dark:bg-gray-800">
+        <div class="mt-3 text-center">
+            <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 dark:bg-red-900/30">
+                <i class="fas fa-exclamation-triangle text-red-600 dark:text-red-400 text-xl"></i>
+            </div>
+            <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mt-4">¿Cerrar propietario activo?</h3>
+            <div class="mt-2 px-7 py-3">
+                <p class="text-sm text-gray-500 dark:text-gray-400">
+                    Esto volverá a la vista general de todos los propietarios. Tendrás que seleccionar un propietario nuevamente para continuar trabajando.
+                </p>
+            </div>
+            <div class="flex gap-4 mt-4">
+                <button id="confirmCloseOwnerCancel" class="px-4 py-2 bg-gray-300 dark:bg-gray-600 text-gray-800 dark:text-gray-200 text-base font-medium rounded-md shadow-sm hover:bg-gray-400 dark:hover:bg-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-300">
+                    Cancelar
+                </button>
+                <button id="confirmCloseOwnerConfirm" class="px-4 py-2 bg-red-600 text-white text-base font-medium rounded-md shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500">
+                    Sí, cerrar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Loading indicator -->
+<div id="ownerChangeLoading" class="bg-gradient-to-r from-yellow-400 to-orange-400 rounded-xl shadow-lg p-4 hidden">
+    <div class="flex items-center justify-center space-x-3">
+        <div class="relative">
+            <div class="w-8 h-8 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
+        </div>
+        <div class="text-white font-medium">
+            <div class="text-sm">Cambiando propietario...</div>
+            <div class="text-xs opacity-80">Esto puede tomar unos segundos</div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const widget = document.getElementById('ownerSelectorWidget');
+    const loadingIndicator = document.getElementById('ownerChangeLoading');
+    const changeLinks = document.querySelectorAll('.owner-change-link');
+    const dropdownButton = document.getElementById('ownerDropdown');
+    const dropdownMenu = document.getElementById('ownerDropdownMenu');
+    
+    // Funcionalidad del dropdown manual
+    if (dropdownButton && dropdownMenu) {
+        dropdownButton.addEventListener('click', function(e) {
+            e.stopPropagation();
+            
+            // Toggle visibility
+            const isHidden = dropdownMenu.classList.contains('hidden');
+            dropdownMenu.classList.toggle('hidden');
+            
+            if (isHidden) {
+                // Posicionar el dropdown correctamente usando posicionamiento fixed
+                const rect = dropdownButton.getBoundingClientRect();
+                const viewportWidth = window.innerWidth;
+                const viewportHeight = window.innerHeight;
+                const dropdownWidth = 320; // w-80 = 320px
+                const dropdownHeight = 300; // altura estimada
+                
+                // Calcular posición inicial (debajo del botón, alineado a la derecha)
+                let top = rect.bottom + 8; // 8px de margen
+                let left = rect.right - dropdownWidth;
+                
+                // Ajustar si se sale por la derecha
+                if (left < 10) {
+                    left = rect.left; // Alinear a la izquierda del botón
+                }
+                if (left + dropdownWidth > viewportWidth - 10) {
+                    left = viewportWidth - dropdownWidth - 10; // Forzar dentro del viewport
+                }
+                
+                // Ajustar si se sale por abajo
+                if (top + dropdownHeight > viewportHeight - 10) {
+                    top = rect.top - dropdownHeight - 8; // Mostrar arriba del botón
+                }
+                if (top < 10) {
+                    top = 10; // Asegurar que no se salga por arriba
+                }
+                
+                // Aplicar posicionamiento
+                dropdownMenu.style.position = 'fixed';
+                dropdownMenu.style.top = `${top}px`;
+                dropdownMenu.style.left = `${left}px`;
+                dropdownMenu.style.right = 'auto';
+                dropdownMenu.style.bottom = 'auto';
+                
+                // Animación suave
+                dropdownMenu.style.opacity = '0';
+                dropdownMenu.style.transform = 'translateY(-10px)';
+                setTimeout(() => {
+                    dropdownMenu.style.transition = 'all 0.2s ease-out';
+                    dropdownMenu.style.opacity = '1';
+                    dropdownMenu.style.transform = 'translateY(0)';
+                }, 10);
+            }
+        });
+        
+        // Cerrar dropdown al hacer click fuera
+        document.addEventListener('click', function(e) {
+            if (!dropdownButton.contains(e.target) && !dropdownMenu.contains(e.target)) {
+                dropdownMenu.classList.add('hidden');
+            }
+        });
+    }
+    
+    // Función para mostrar/ocultar loading
+    function toggleLoading(show) {
+        if (show) {
+            widget.classList.add('hidden');
+            loadingIndicator.classList.remove('hidden');
+        } else {
+            widget.classList.remove('hidden');
+            loadingIndicator.classList.add('hidden');
+        }
+    }
+    
+    // Función para mostrar notificaciones mejoradas
+    function showNotification(message, type = 'success') {
+        // Crear contenedor de notificaciones si no existe
+        let notificationContainer = document.getElementById('notificationContainer');
+        if (!notificationContainer) {
+            notificationContainer = document.createElement('div');
+            notificationContainer.id = 'notificationContainer';
+            notificationContainer.className = 'fixed top-4 right-4 z-50 space-y-3';
+            document.body.appendChild(notificationContainer);
+        }
+        
+        // Crear la notificación
+        const notificationId = 'notification-' + Date.now();
+        const colorClasses = type === 'success' 
+            ? 'bg-gradient-to-r from-green-500 to-emerald-500' 
+            : 'bg-gradient-to-r from-red-500 to-rose-500';
+        
+        const notificationHtml = `
+            <div id="${notificationId}" class="${colorClasses} text-white px-6 py-4 rounded-xl shadow-2xl transform transition-all duration-300 translate-x-full opacity-0 border border-white/20">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
+                            <i class="fas ${type === 'success' ? 'fa-check' : 'fa-exclamation-triangle'} text-sm"></i>
+                        </div>
+                        <span class="font-medium">${message}</span>
+                    </div>
+                    <button onclick="removeNotification('${notificationId}')" class="ml-4 text-white/80 hover:text-white transition-colors">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        notificationContainer.insertAdjacentHTML('beforeend', notificationHtml);
+        const notificationElement = document.getElementById(notificationId);
+        
+        // Animar entrada
+        setTimeout(() => {
+            notificationElement.classList.remove('translate-x-full', 'opacity-0');
+        }, 100);
+        
+        // Auto-remover después de 5 segundos
+        setTimeout(() => {
+            removeNotification(notificationId);
+        }, 5000);
+    }
+    
+    // Función global para remover notificaciones
+    window.removeNotification = function(notificationId) {
+        const notification = document.getElementById(notificationId);
+        if (notification) {
+            notification.classList.add('translate-x-full', 'opacity-0');
+            setTimeout(() => {
+                notification.remove();
+            }, 300);
+        }
+    };
+    
+    // Agregar listeners a los enlaces de cambio
+    changeLinks.forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            
+            const ownerId = this.dataset.ownerId;
+            const ownerName = this.dataset.ownerName;
+            
+            if (!ownerId) {
+                console.error('ID de propietario no encontrado');
+                return;
+            }
+            
+            // Cerrar dropdown
+            if (dropdownMenu) {
+                dropdownMenu.classList.add('hidden');
+            }
+            
+            // Mostrar loading
+            toggleLoading(true);
+            
+            // Obtener token CSRF de forma robusta
+            const csrfMeta = document.querySelector('meta[name=csrf-token]');
+            if (!csrfMeta) {
+                showNotification('Error de configuración: Token CSRF no encontrado', 'error');
+                toggleLoading(false);
+                return;
+            }
+            const csrfToken = csrfMeta.getAttribute('content');
+            
+            // Crear FormData con token CSRF
+            const formData = new FormData();
+            formData.append('csrf_token', csrfToken);
+            formData.append('propietario_id', ownerId);
+            
+            // Realizar petición AJAX usando FormData
+            fetch('{{ url_for("owner_selector_bp.api_change_owner") }}', {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification(`Cambiado a ${ownerName}`, 'success');
+                    // Recargar la página para actualizar el contenido
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                } else {
+                    showNotification(data.message || 'Error al cambiar propietario', 'error');
+                    toggleLoading(false);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showNotification('Error de conexión al cambiar propietario', 'error');
+                toggleLoading(false);
+            });
+        });
+    });
+    
+    // Manejar botón de cerrar propietario activo
+    const clearOwnerButton = document.getElementById('clearOwnerButton');
+    if (clearOwnerButton) {
+        clearOwnerButton.addEventListener('click', function(e) {
+            e.preventDefault();
+            showCloseOwnerModal();
+        });
+    }
+    
+    // Funciones para manejar el modal de confirmación
+    window.showCloseOwnerModal = function() {
+        const modal = document.getElementById('confirmCloseOwnerModal');
+        modal.classList.remove('hidden');
+    };
+    
+    window.hideCloseOwnerModal = function() {
+        const modal = document.getElementById('confirmCloseOwnerModal');
+        modal.classList.add('hidden');
+    };
+    
+    // Event listeners para el modal
+    const cancelButton = document.getElementById('confirmCloseOwnerCancel');
+    const confirmButton = document.getElementById('confirmCloseOwnerConfirm');
+    const modal = document.getElementById('confirmCloseOwnerModal');
+    
+    if (cancelButton) {
+        cancelButton.addEventListener('click', hideCloseOwnerModal);
+    }
+    
+    if (modal) {
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal) {
+                hideCloseOwnerModal();
+            }
+        });
+    }
+    
+    if (confirmButton) {
+        confirmButton.addEventListener('click', function() {
+            hideCloseOwnerModal();
+            
+            // Mostrar loading
+            toggleLoading(true);
+            
+            // Obtener token CSRF
+            const csrfMeta = document.querySelector('meta[name=csrf-token]');
+            if (!csrfMeta) {
+                showNotification('Error de configuración: Token CSRF no encontrado', 'error');
+                toggleLoading(false);
+                return;
+            }
+            const csrfToken = csrfMeta.getAttribute('content');
+            
+            // Crear FormData con token CSRF
+            const formData = new FormData();
+            formData.append('csrf_token', csrfToken);
+            
+            // Realizar petición AJAX
+            fetch('{{ url_for("owner_selector_bp.api_clear_owner") }}', {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification('Propietario activo cerrado correctamente', 'success');
+                    // Recargar la página para mostrar vista general
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                } else {
+                    showNotification(data.message || 'Error al cerrar propietario activo', 'error');
+                    toggleLoading(false);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showNotification('Error de conexión al cerrar propietario activo', 'error');
+                toggleLoading(false);
+            });
+        });
+    }
+});
+</script>

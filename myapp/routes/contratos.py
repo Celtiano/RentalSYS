@@ -15,11 +15,19 @@ import uuid
 
 # --- IMPORTS AUTH/ROLES ---
 from flask_login import login_required, current_user
-from ..decorators import role_required, owner_access_required # Asumiendo que tienes decorators.py
+from ..decorators import (
+    role_required, owner_access_required,
+    filtered_list_view, filtered_detail_view, with_owner_filtering, validate_entity_access
+)
 # --------------------------
 
 from ..models import db, Contrato, Propiedad, Inquilino, Documento, Propietario, HistorialActualizacionRenta
 from ..utils.file_helpers import get_owner_document_path
+from ..utils.database_helpers import (
+    get_filtered_contratos, get_filtered_propiedades, get_filtered_inquilinos,
+    OwnerFilteredQueries
+)
+from ..utils.owner_session import get_active_owner_context
 
 from ..forms import CSRFOnlyForm 
 
@@ -155,70 +163,31 @@ def _generate_next_contract_number():
 
 
 @contratos_bp.route('/', methods=['GET'])
-@login_required # Ya cubierto por before_request del blueprint
+@filtered_list_view(entity_type='contrato', log_queries=True)
 def listar_contratos():
-    contratos_list_display = []
-    # Para los <select> en los modales de crear/editar contrato
-    propiedades_para_select = []
-    inquilinos_para_select = []
-    # Para el filtro de propietario en la tabla de contratos
-    propietarios_para_filtro_tabla = []
-
+    """Lista contratos filtrados automáticamente por propietario activo."""
     csrf_form = CSRFOnlyForm()
-    suggested_contract_number = _generate_next_contract_number() # Asumiendo que _generate_next_contract_number está definida
+    suggested_contract_number = _generate_next_contract_number()
     por_vencer_count = 0
 
     try:
-        # --- Query base para Contratos a mostrar en la tabla ---
-        query_contratos = db.session.query(Contrato).options(
-            joinedload(Contrato.propiedad_ref).joinedload(Propiedad.propietario_ref),
-            joinedload(Contrato.inquilino_ref),
-            selectinload(Contrato.documentos)
-        )
+        # Filtrado automático aplicado - solo contratos del propietario activo
+        contratos_list_display = get_filtered_contratos(
+            include_relations=True
+        ).order_by(Contrato.fecha_inicio.desc()).all()
 
-        # --- Cargar listas para los SELECTORES en los modales y filtros de tabla ---
-        if current_user.role == 'admin':
-            contratos_list_display = query_contratos.order_by(Contrato.fecha_inicio.desc()).all()
-            propiedades_para_select = Propiedad.query.order_by(Propiedad.direccion).all() # Admin ve todas las propiedades
-            inquilinos_para_select = Inquilino.query.order_by(Inquilino.nombre).all() # Admin ve todos los inquilinos
-            propietarios_para_filtro_tabla = Propietario.query.order_by(Propietario.nombre).all() # Admin ve todos los propietarios para filtrar
+        # Propiedades filtradas automáticamente
+        propiedades_para_select = get_filtered_propiedades().order_by(Propiedad.direccion).all()
         
-        elif current_user.role == 'gestor':
-            assigned_owner_ids = [p.id for p in current_user.propietarios_asignados]
-            if not assigned_owner_ids:
-                contratos_list_display = []
-                propiedades_para_select = []
-                # Inquilinos: un gestor podría ver todos o solo los de sus contratos.
-                # Por ahora, mantenemos que ve todos para la selección.
-                inquilinos_para_select = Inquilino.query.order_by(Inquilino.nombre).all()
-                propietarios_para_filtro_tabla = current_user.propietarios_asignados # Solo sus propietarios para filtrar la tabla
-            else:
-                # Contratos para la tabla (solo de sus propietarios)
-                query_contratos = query_contratos.join(Contrato.propiedad_ref).filter(Propiedad.propietario_id.in_(assigned_owner_ids))
-                contratos_list_display = query_contratos.order_by(Contrato.fecha_inicio.desc()).all()
+        # Inquilinos disponibles para NUEVOS contratos (sin filtrar por contratos existentes)
+        from ..utils.database_helpers import get_inquilinos_available_for_new_contracts
+        inquilinos_para_select = get_inquilinos_available_for_new_contracts().order_by(Inquilino.nombre).all()
+        
+        # Propietarios disponibles del contexto automático
+        owner_context = get_active_owner_context()
+        propietarios_para_filtro_tabla = owner_context.get('available_owners', [])
 
-                # Propiedades para los <select> de los modales (solo de sus propietarios)
-                propiedades_para_select = Propiedad.query.filter(Propiedad.propietario_id.in_(assigned_owner_ids)).order_by(Propiedad.direccion).all()
-                
-                # Inquilinos (ver comentario arriba)
-                inquilinos_para_select = Inquilino.query.order_by(Inquilino.nombre).all()
-                propietarios_para_filtro_tabla = current_user.propietarios_asignados
-
-        elif current_user.role == 'usuario':
-            # Un usuario solo ve contratos de sus propiedades/propietarios
-            assigned_owner_ids = [p.id for p in current_user.propietarios_asignados]
-            if assigned_owner_ids:
-                query_contratos = query_contratos.join(Contrato.propiedad_ref).filter(Propiedad.propietario_id.in_(assigned_owner_ids))
-                contratos_list_display = query_contratos.order_by(Contrato.fecha_inicio.desc()).all()
-            else:
-                contratos_list_display = []
-            # Un 'usuario' probablemente no crea contratos, así que las listas para select pueden ser vacías o no pasarse.
-            propiedades_para_select = []
-            inquilinos_para_select = []
-            propietarios_para_filtro_tabla = current_user.propietarios_asignados
-
-
-        # Calcular contratos por vencer (basado en la lista ya filtrada 'contratos_list_display')
+        # Calcular contratos por vencer
         today = date.today()
         limit_date = today + timedelta(days=30)
         por_vencer_count = sum(
@@ -229,7 +198,6 @@ def listar_contratos():
     except Exception as e:
         flash(f'Error cargando datos de contratos: {e}', 'danger')
         current_app.logger.error(f"Error en GET /contratos: {e}", exc_info=True)
-        # Asegurar valores por defecto si falla la carga
         contratos_list_display, propiedades_para_select, inquilinos_para_select, propietarios_para_filtro_tabla = [], [], [], []
         por_vencer_count = 0
 
@@ -248,6 +216,7 @@ def listar_contratos():
 
 @contratos_bp.route('/add', methods=['POST'])
 @role_required('admin', 'gestor')  # Solo admin y gestor pueden añadir
+@with_owner_filtering(require_active_owner=False)  # No requiere propietario activo para creación
 def add_contrato():
     # Obtención de datos del formulario
     num_contrato_identificador_form = request.form.get('contractNumber')
@@ -307,16 +276,20 @@ def add_contrato():
         payment_day_int_final = int(payment_day_form_str or 1)
         if not (1 <= payment_day_int_final <= 31): payment_day_int_final = 1
 
+        # Validar acceso a la propiedad usando el sistema de filtrado
+        if not OwnerFilteredQueries.validate_access_to_entity('propiedad', int(prop_id_form_str)):
+            flash("No tienes permiso para crear contratos para esta propiedad.", "danger")
+            return redirect(url_for('contratos_bp.listar_contratos'))
+            
+        # Validar acceso al inquilino usando el sistema de filtrado
+        if not OwnerFilteredQueries.validate_access_to_entity('inquilino', int(ten_id_form_str)):
+            flash("No tienes permiso para crear contratos con este inquilino.", "danger")
+            return redirect(url_for('contratos_bp.listar_contratos'))
+
         prop_obj_db   = db.session.get(Propiedad, int(prop_id_form_str))
         tenant_obj_db = db.session.get(Inquilino, int(ten_id_form_str))
         if not prop_obj_db: raise ValueError("La propiedad seleccionada no existe.")
         if not tenant_obj_db: raise ValueError("El inquilino seleccionado no existe.")
-
-        if current_user.role == 'gestor':
-            assigned_owner_ids = {owner.id for owner in current_user.propietarios_asignados}
-            if prop_obj_db.propietario_id not in assigned_owner_ids:
-                flash("No tienes permiso para crear contratos para esta propiedad.", "danger")
-                return redirect(url_for('contratos_bp.listar_contratos'))
         
         final_actualiza_ipc_bool, final_actualiza_irav_bool = False, False
         ipc_ano_int_val, ipc_mes_int_val, importe_fijo_dec_final = None, None, None
@@ -402,11 +375,13 @@ def add_contrato():
 
 
 @contratos_bp.route('/edit/<int:id>', methods=['POST'])
-@owner_access_required() # Verifica acceso al propietario de este contrato
+@login_required
+@validate_entity_access('contrato', 'id')  # Validación automática de acceso
 def edit_contrato(id):
-    contract = db.session.get(Contrato, id)
+    # La validación de acceso ya se hizo automáticamente
+    contract = OwnerFilteredQueries.get_contrato_by_id(id, include_relations=True)
     if not contract:
-        flash('Contrato no encontrado.', 'warning')
+        flash('Contrato no encontrado o sin acceso.', 'warning')
         return redirect(url_for('contratos_bp.listar_contratos'))
 
     # Guardar el precio mensual anterior para compararlo después
@@ -612,16 +587,14 @@ def edit_contrato(id):
 
 
 @contratos_bp.route('/delete/<int:id>', methods=['POST'])
-@owner_access_required() # Verifica acceso al propietario de este contrato
 @role_required('admin', 'gestor') # Solo admin o gestor pueden borrar
+@validate_entity_access('contrato', 'id') # Validación automática de acceso
 def delete_contrato(id):
-    # Usar options(joinedload(...)) no es estrictamente necesario para una operación de delete
-    # si solo necesitas el objeto principal y confías en las cascadas.
-    # Pero si necesitas acceder a datos relacionados ANTES del delete, está bien.
-    contract = db.session.get(Contrato, id) 
+    # La validación de acceso ya se hizo automáticamente
+    contract = OwnerFilteredQueries.get_contrato_by_id(id, include_relations=True)
 
     if not contract:
-        flash('Contrato no encontrado.', 'warning')
+        flash('Contrato no encontrado o sin acceso.', 'warning')
         return redirect(url_for('contratos_bp.listar_contratos'))
 
     # Opcional: Verificación de permiso adicional si owner_access_required no es suficiente
@@ -682,6 +655,8 @@ def delete_contrato(id):
 
 
 @contratos_bp.route('/uploads/contracts/<path:filename>')
+@login_required
+@with_owner_filtering()
 def serve_contract_upload(filename):
     try:
         doc = Documento.query.filter_by(filename=filename).options(
@@ -692,14 +667,12 @@ def serve_contract_upload(filename):
             current_app.logger.warning(f"serve_contract_upload: Documento o propietario no encontrado para filename {filename}")
             abort(404)
 
-        propietario_del_documento = doc.contrato_ref.propiedad_ref.propietario_ref
+        # Validar acceso al contrato usando el sistema de filtrado
+        if not OwnerFilteredQueries.validate_access_to_entity('contrato', doc.contrato_ref.id):
+            flash("No tienes permiso para ver este documento.", "danger")
+            abort(403)
 
-        # Verificar permiso de acceso
-        if current_user.role != 'admin':
-             assigned_owner_ids = {p.id for p in current_user.propietarios_asignados}
-             if propietario_del_documento.id not in assigned_owner_ids:
-                 flash("No tienes permiso para ver este documento.", "danger")
-                 abort(403)
+        propietario_del_documento = doc.contrato_ref.propiedad_ref.propietario_ref
 
         # Obtener la ruta de la carpeta donde está el archivo
         # El 'filename' en la BD es el nombre real en disco (puede ser el UUID.hex o el original asegurado)
@@ -725,14 +698,13 @@ def serve_contract_upload(filename):
         abort(500)
 
 @contratos_bp.route('/ver/<int:id>', methods=['GET'])
-@owner_access_required() # Verifica acceso al propietario de este contrato
+@login_required
+@filtered_detail_view('contrato', 'id', log_queries=True) # Validación automática de acceso y filtrado
 def ver_contrato(id):
-    contract = db.session.query(Contrato).options(
-        joinedload(Contrato.propiedad_ref),
-        joinedload(Contrato.inquilino_ref),
-        selectinload(Contrato.documentos),
-        selectinload(Contrato.historial_actualizaciones).joinedload(HistorialActualizacionRenta.factura) # Cargar historial y factura asociada
-    ).get_or_404(id)
+    # La validación de acceso ya se hizo automáticamente
+    contract = OwnerFilteredQueries.get_contrato_by_id(id, include_relations=True)
+    if not contract:
+        abort(404)
     
     # Ordenar el historial por fecha descendente para mostrar el más reciente primero
     # Hacemos esto en Python ya que el selectinload no permite order_by directamente en la relación cargada de esta forma.

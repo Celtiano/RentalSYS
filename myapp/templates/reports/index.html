@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block title %}Informes y Exportaciones - RentalSYS{% endblock %}
+
+{% block content %}
+<div class="container mx-auto mt-8 px-4 pb-8">
+    <!-- Header Section -->
+    <div class="text-center mb-8">
+        <div class="mb-4">
+            <div class="w-20 h-20 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i class="fas fa-chart-bar text-white text-3xl"></i>
+            </div>
+            <h1 class="text-3xl font-bold text-gray-800 dark:text-white mb-2">Informes y Exportaciones</h1>
+            <p class="text-gray-600 dark:text-gray-400">Genera listados, informes y exportaciones de datos</p>
+        </div>
+    </div>
+
+    <!-- Mensaje temporal -->
+    <div class="bg-blue-50 border border-blue-200 rounded-lg p-6 max-w-2xl mx-auto">
+        <div class="flex items-center">
+            <i class="fas fa-info-circle text-blue-500 text-xl mr-3"></i>
+            <div>
+                <h3 class="text-lg font-medium text-blue-800 mb-2">¡Funcionalidad en Desarrollo!</h3>
+                <p class="text-blue-700">
+                    Esta página está funcionando correctamente. Las funcionalidades completas estarán disponibles pronto.
+                </p>
+                <p class="text-sm text-blue-600 mt-2">
+                    Para funcionalidad completa, instala: <code>pip install xlsxwriter reportlab</code>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Botones de prueba -->
+    <div class="mt-8 text-center">
+        <a href="{{ url_for('main_bp.dashboard') }}" 
+           class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-3 rounded-lg transition-colors">
+            <i class="fas fa-arrow-left mr-2"></i>
+            Volver al Dashboard
+        </a>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+
+{% block title %}Seleccionar Propietario - RentalSYS{% endblock %}
+
+{% block content %}
+<div class="container mx-auto mt-8 px-4">
+    <div class="max-w-2xl mx-auto">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700">
+            <div class="bg-blue-500 text-white px-6 py-4 rounded-t-lg">
+                <h4 class="text-xl font-semibold flex items-center">
+                    <i class="fas fa-user-cog mr-3"></i> Seleccionar Propietario
+                </h4>
+            </div>
+            <div class="p-6">
+                    {% if active_owner %}
+                        <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-4 mb-6">
+                            <div class="flex items-center">
+                                <i class="fas fa-info-circle text-blue-500 mr-3"></i>
+                                <div>
+                                    <span class="font-semibold text-blue-800 dark:text-blue-200">Propietario actual:</span>
+                                    <span class="text-blue-700 dark:text-blue-300">{{ active_owner.nombre }} ({{ active_owner.nif }})</span>
+                                </div>
+                            </div>
+                        </div>
+                    {% endif %}
+
+                    {% if available_owners|length == 0 %}
+                        <div class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg p-8 text-center">
+                            <i class="fas fa-exclamation-triangle text-yellow-500 text-6xl mb-6"></i>
+                            <h5 class="text-xl font-semibold text-yellow-800 dark:text-yellow-200 mb-4">No hay propietarios disponibles</h5>
+                            <p class="text-yellow-700 dark:text-yellow-300 mb-0">No tienes propietarios asignados. Contacta con el administrador para obtener acceso.</p>
+                        </div>
+                        <div class="text-center mt-6">
+                            <a href="{{ url_for('main_bp.dashboard') }}" class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg transition-colors">
+                                <i class="fas fa-arrow-left mr-2"></i> Volver al Dashboard
+                            </a>
+                        </div>
+                    
+                    {% elif available_owners|length == 1 %}
+                        <div class="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg p-8 text-center">
+                            <i class="fas fa-check-circle text-green-500 text-6xl mb-6"></i>
+                            <h5 class="text-xl font-semibold text-green-800 dark:text-green-200 mb-4">Propietario único detectado</h5>
+                            <p class="text-green-700 dark:text-green-300">Se seleccionará automáticamente: <strong>{{ available_owners[0].nombre }}</strong></p>
+                        </div>
+                        <form method="POST" class="text-center mt-6">
+                            <input type="hidden" name="propietario_id" value="{{ available_owners[0].id }}">
+                            {% if next_url %}
+                                <input type="hidden" name="next" value="{{ next_url }}">
+                            {% endif %}
+                            <button type="submit" class="bg-green-500 hover:bg-green-600 text-white px-8 py-3 rounded-lg text-lg font-semibold transition-colors">
+                                <i class="fas fa-check mr-2"></i> Continuar
+                            </button>
+                        </form>
+                    
+                    {% else %}
+                        <p class="text-gray-600 dark:text-gray-400 mb-6">
+                            Selecciona el propietario con el que deseas trabajar. Puedes cambiar esta selección en cualquier momento.
+                        </p>
+
+                        <form method="POST" id="ownerSelectionForm">
+                            {% if next_url %}
+                                <input type="hidden" name="next" value="{{ next_url }}">
+                            {% endif %}
+                            
+                            <div class="mb-6">
+                                <label for="propietario_id" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">
+                                    Propietarios disponibles:
+                                </label>
+                                
+                                <div class="space-y-3 max-h-96 overflow-y-auto">
+                                    {% for propietario in available_owners %}
+                                        <div class="owner-card">
+                                            <input type="radio" 
+                                                   name="propietario_id" 
+                                                   value="{{ propietario.id }}" 
+                                                   id="owner_{{ propietario.id }}"
+                                                   class="sr-only"
+                                                   {% if active_owner and active_owner.id == propietario.id %}checked{% endif %}>
+                                            
+                                            <label for="owner_{{ propietario.id }}" class="block cursor-pointer">
+                                                <div class="border-2 border-gray-200 dark:border-gray-600 rounded-lg p-4 hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all duration-200 owner-card-border">
+                                                    <div class="flex items-center">
+                                                        <div class="mr-4">
+                                                            <i class="fas fa-user-tie text-3xl text-blue-500"></i>
+                                                        </div>
+                                                        <div class="flex-1">
+                                                            <h6 class="font-semibold text-gray-800 dark:text-gray-200 mb-1">{{ propietario.nombre }}</h6>
+                                                            <p class="text-sm text-gray-600 dark:text-gray-400 mb-1">
+                                                                <i class="fas fa-id-card mr-1"></i> {{ propietario.nif }}
+                                                            </p>
+                                                            {% if propietario.ciudad %}
+                                                                <p class="text-sm text-gray-600 dark:text-gray-400 mb-0">
+                                                                    <i class="fas fa-map-marker-alt mr-1"></i> {{ propietario.ciudad }}
+                                                                </p>
+                                                            {% endif %}
+                                                        </div>
+                                                        <div class="owner-check">
+                                                            <i class="fas fa-check-circle text-green-500 text-xl hidden"></i>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </label>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                                </div>
+                            </div>
+
+                            <div class="flex flex-col sm:flex-row gap-3 sm:justify-end">
+                                <a href="{{ url_for('main_bp.dashboard') }}" class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg transition-colors text-center">
+                                    <i class="fas fa-times mr-2"></i> Cancelar
+                                </a>
+                                <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-lg transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed" id="submitBtn" disabled>
+                                    <i class="fas fa-check mr-2"></i> Seleccionar Propietario
+                                </button>
+                            </div>
+                        </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.owner-card input[type="radio"]:checked + label .owner-card-border {
+    border-color: #3b82f6;
+    background-color: #eff6ff;
+}
+
+.dark .owner-card input[type="radio"]:checked + label .owner-card-border {
+    border-color: #60a5fa;
+    background-color: #1e3a8a20;
+}
+
+.owner-card input[type="radio"]:checked + label .owner-check i {
+    display: inline-block !important;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('ownerSelectionForm');
+    const submitBtn = document.getElementById('submitBtn');
+    const radioButtons = document.querySelectorAll('input[name="propietario_id"]');
+    
+    if (form && submitBtn && radioButtons.length > 0) {
+        // Verificar si hay alguno seleccionado al cargar
+        const anyChecked = Array.from(radioButtons).some(radio => radio.checked);
+        submitBtn.disabled = !anyChecked;
+        
+        // Agregar listener a cada radio button
+        radioButtons.forEach(radio => {
+            radio.addEventListener('change', function() {
+                submitBtn.disabled = false;
+            });
+        });
+        
+        // Prevenir envío si no hay selección
+        form.addEventListener('submit', function(e) {
+            const selected = document.querySelector('input[name="propietario_id"]:checked');
+            if (!selected) {
+                e.preventDefault();
+                alert('Debes seleccionar un propietario antes de continuar.');
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

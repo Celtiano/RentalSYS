@@ -1,0 +1,115 @@
+<!-- Componente de Información del Propietario -->
+{% if has_active_owner %}
+<div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+    <!-- Header con gradiente -->
+    <div class="bg-gradient-to-r from-blue-500 to-indigo-600 p-6 text-white">
+        <div class="flex items-center space-x-4">
+            <div class="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center ring-4 ring-white/30">
+                <i class="fas fa-user-tie text-2xl"></i>
+            </div>
+            <div>
+                <h3 class="text-xl font-bold">{{ active_owner.nombre }}</h3>
+                <p class="text-blue-100">{{ active_owner.nif }}</p>
+                {% if active_owner.ciudad %}
+                    <p class="text-blue-200 text-sm">
+                        <i class="fas fa-map-marker-alt mr-1"></i>{{ active_owner.ciudad }}
+                    </p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Contenido de la tarjeta -->
+    <div class="p-6">
+        <!-- Estadísticas principales -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div class="text-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                <div class="text-2xl font-bold text-blue-600 dark:text-blue-400">{{ active_owner.propiedades|length }}</div>
+                <div class="text-sm text-blue-600 dark:text-blue-400">Propiedades</div>
+            </div>
+            <div class="text-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                <div class="text-2xl font-bold text-green-600 dark:text-green-400">0</div>
+                <div class="text-sm text-green-600 dark:text-green-400">Contratos</div>
+            </div>
+            <div class="text-center p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                <div class="text-2xl font-bold text-purple-600 dark:text-purple-400">0</div>
+                <div class="text-sm text-purple-600 dark:text-purple-400">Facturas</div>
+            </div>
+            <div class="text-center p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+                <div class="text-2xl font-bold text-orange-600 dark:text-orange-400">€0</div>
+                <div class="text-sm text-orange-600 dark:text-orange-400">Ingresos</div>
+            </div>
+        </div>
+
+        <!-- Información de contacto -->
+        {% if active_owner.telefono or active_owner.email %}
+        <div class="border-t border-gray-200 dark:border-gray-600 pt-4">
+            <h4 class="font-semibold text-gray-800 dark:text-gray-200 mb-3">Información de Contacto</h4>
+            <div class="space-y-2">
+                {% if active_owner.telefono %}
+                    <div class="flex items-center space-x-3">
+                        <div class="w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
+                            <i class="fas fa-phone text-blue-600 dark:text-blue-400 text-sm"></i>
+                        </div>
+                        <span class="text-gray-700 dark:text-gray-300">{{ active_owner.telefono }}</span>
+                    </div>
+                {% endif %}
+                {% if active_owner.email %}
+                    <div class="flex items-center space-x-3">
+                        <div class="w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
+                            <i class="fas fa-envelope text-blue-600 dark:text-blue-400 text-sm"></i>
+                        </div>
+                        <span class="text-gray-700 dark:text-gray-300">{{ active_owner.email }}</span>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Footer con acciones -->
+    <div class="bg-gray-50 dark:bg-gray-700 px-6 py-4 border-t border-gray-200 dark:border-gray-600">
+        <div class="flex justify-between items-center">
+            <div class="text-sm text-gray-500 dark:text-gray-400">
+                <i class="fas fa-clock mr-1"></i>
+                Activo desde hoy
+            </div>
+            <div class="flex space-x-2">
+                <button type="button" 
+                        class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md text-sm transition-colors"
+                        onclick="openOwnerModal()">
+                    <i class="fas fa-exchange-alt mr-1"></i>
+                    Cambiar
+                </button>
+                <a href="{{ url_for('owner_selector_bp.select_owner') }}" 
+                   class="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded-md text-sm transition-colors">
+                    <i class="fas fa-cog mr-1"></i>
+                    Gestionar
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% else %}
+<!-- Estado sin propietario -->
+<div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+    <div class="bg-gradient-to-r from-yellow-500 to-orange-500 p-6 text-white text-center">
+        <div class="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
+            <i class="fas fa-exclamation-triangle text-2xl"></i>
+        </div>
+        <h3 class="text-xl font-bold mb-2">Sin Propietario Activo</h3>
+        <p class="text-white/90">Selecciona un propietario para acceder a todas las funcionalidades</p>
+    </div>
+    
+    <div class="p-6 text-center">
+        <p class="text-gray-600 dark:text-gray-400 mb-6">
+            Para comenzar a trabajar, necesitas seleccionar un propietario de tu lista de acceso.
+        </p>
+        <a href="{{ url_for('owner_selector_bp.select_owner') }}" 
+           class="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white px-6 py-3 rounded-xl transition-all font-medium">
+            <i class="fas fa-user-plus mr-2"></i>
+            Seleccionar Propietario
+        </a>
+    </div>
+</div>
+{% endif %}

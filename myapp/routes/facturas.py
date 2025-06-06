@@ -31,7 +31,15 @@ from ..utils.pdf_generator import generate_invoice_pdf # O la v2 que prefieras
 from ..forms import CSRFOnlyForm
 from .. import mail
 from flask_login import login_required, current_user
-from ..decorators import role_required, owner_access_required
+from ..decorators import (
+    role_required, owner_access_required,
+    filtered_list_view, filtered_detail_view, with_owner_filtering, validate_entity_access
+)
+from ..utils.database_helpers import (
+    get_filtered_facturas, get_filtered_contratos, get_filtered_propiedades, 
+    get_filtered_inquilinos, OwnerFilteredQueries
+)
+from ..utils.owner_session import get_active_owner_context
 
 
 
@@ -400,7 +408,16 @@ def generate_monthly_invoices(year: int, month: int):
             Contrato.fecha_inicio <= fin_periodo_factura,
             or_(Contrato.fecha_fin.is_(None), Contrato.fecha_fin >= inicio_periodo_factura)
         )
-        if current_user.role != 'admin':
+        # Primero verificar si hay propietario activo
+        active_owner_context = get_active_owner_context()
+        if active_owner_context and active_owner_context.get('active_owner'):
+            # Si hay propietario activo, solo generar facturas para ese propietario
+            active_owner_id = active_owner_context['active_owner'].id
+            query_contratos = query_contratos.join(Propiedad, Contrato.propiedad_id == Propiedad.id)\
+                                             .filter(Propiedad.propietario_id == active_owner_id)
+            current_app.logger.info(f"generate_monthly_invoices: Generando facturas solo para propietario activo: {active_owner_context['active_owner'].nombre} (ID: {active_owner_id})")
+        elif current_user.role != 'admin':
+            # Si no hay propietario activo, aplicar filtro por rol para gestores
             assigned_owner_ids = [p.id for p in current_user.propietarios_asignados]
             if not assigned_owner_ids:
                 current_app.logger.info("generate_monthly_invoices: Usuario no admin sin propietarios asignados.")
@@ -656,20 +673,29 @@ def enviar_facturas_masivo():
                 selectinload(Factura.gastos_incluidos) # Para adjuntar gastos
             )
 
-            # *** APLICAR FILTRO POR ROL/PROPIETARIO ***
-            if current_user.role != 'admin':
+            # *** APLICAR FILTRO POR PROPIETARIO ACTIVO Y ROL ***
+            # Primero verificar si hay propietario activo
+            active_owner_context = get_active_owner_context()
+            if active_owner_context and active_owner_context.get('active_owner'):
+                # Si hay propietario activo, solo enviar facturas de ese propietario
+                active_owner_id = active_owner_context['active_owner'].id
+                query_facturas = query_facturas.join(Factura.propiedad_ref).filter(
+                    Propiedad.propietario_id == active_owner_id
+                )
+                current_app.logger.info(f"Envío masivo limitado al propietario activo: {active_owner_context['active_owner'].nombre} (ID: {active_owner_id})")
+            elif current_user.role != 'admin':
+                # Si no hay propietario activo, aplicar filtro por rol para gestores
                 assigned_owner_ids = [p.id for p in current_user.propietarios_asignados]
                 if not assigned_owner_ids:
                     flash(f"No tienes propietarios asignados para el envío masivo de facturas.", 'warning')
                     current_app.logger.warning(f"Usuario {current_user.username} (rol {current_user.role}) intentó envío masivo sin propietarios asignados.")
-                    # Pasar csrf_form también al redirigir para que el template no falle si se usa ahí
                     return redirect(url_for('facturas_bp.enviar_facturas_masivo'))
                 
                 # Filtrar facturas para que solo incluya las de propiedades de sus propietarios asignados
                 query_facturas = query_facturas.join(Factura.propiedad_ref).filter(
                     Propiedad.propietario_id.in_(assigned_owner_ids)
                 )
-                current_app.logger.info(f"Envío masivo para {current_user.username} limitado a propietarios: {assigned_owner_ids}")
+                current_app.logger.info(f"Envío masivo para {current_user.username} limitado a propietarios asignados: {assigned_owner_ids}")
             else:
                 current_app.logger.info(f"Envío masivo como ADMIN (todos los propietarios aplicables al mes/año).")
             # *** FIN FILTRO ***
@@ -721,90 +747,53 @@ def enviar_facturas_masivo():
     hoy = date.today()
     # Lista de años recientes (puedes ajustar el rango)
     years_list = list(range(hoy.year + 1, hoy.year - 5, -1))
+    
+    # Incluir información del propietario activo si existe
+    active_owner_context = get_active_owner_context()
+    active_owner_info = None
+    if active_owner_context and active_owner_context.get('active_owner'):
+        active_owner_info = {
+            'id': active_owner_context['active_owner'].id,
+            'nombre': active_owner_context['active_owner'].nombre
+        }
+    
     return render_template(
         'enviar_facturas_masivo.html',
         title="Envío Masivo Emails",
         years_list=years_list,
         meses=MESES_STR,
-        csrf_form=csrf_form # <-- Pasar al template
+        csrf_form=csrf_form,
+        active_owner_info=active_owner_info
     )
 
 
 # --- Rutas CRUD Facturas ---
 @facturas_bp.route('/', methods=['GET'])
-@login_required
+@filtered_list_view(entity_type='factura', log_queries=True)
 def listar_facturas():
+    """Lista facturas filtradas automáticamente por propietario activo."""
     iva_rate_actual, irpf_rate_actual = get_rates()
-    facturas_a_mostrar = []
-    propietarios_para_select, inquilinos_para_select, contratos_para_select, propiedades_para_modales = [], [], [], []
     csrf_form_inst = CSRFOnlyForm()
     pagination = None # Inicializar para evitar NameError si hay excepción temprana
 
     current_app.logger.info(f"--- LISTAR FACTURAS - Usuario: {current_user.username}, Rol: {current_user.role} ---")
 
     try:
-        # 1. Query Base para todas las facturas
-        query_facturas = db.session.query(Factura).options(
-            joinedload(Factura.inquilino_ref),
-            joinedload(Factura.propiedad_ref).joinedload(Propiedad.propietario_ref), # Esencial para el filtro y datos del propietario
-            joinedload(Factura.contrato_ref)
-        )
+        # Filtrado automático aplicado - solo facturas del propietario activo
+        facturas_a_mostrar = get_filtered_facturas(
+            include_relations=True
+        ).order_by(Factura.fecha_emision.desc(), Factura.id.desc()).all()
+        
+        current_app.logger.info(f"Número de facturas recuperadas después del filtro automático: {len(facturas_a_mostrar)}")
 
-        # 2. *** FILTRADO DE FACTURAS POR ROL DEL USUARIO ***
-        if current_user.role != 'admin':
-            # Para gestores y usuarios, filtrar por propietarios asignados
-            assigned_owner_ids = [p.id for p in current_user.propietarios_asignados]
-            current_app.logger.info(f"Filtrando facturas para propietarios asignados IDs: {assigned_owner_ids}")
-
-            if not assigned_owner_ids:
-                # Si no tiene propietarios asignados, no debería ver ninguna factura
-                current_app.logger.info("No hay propietarios asignados, query_facturas no devolverá resultados.")
-                query_facturas = query_facturas.filter(Factura.id == -1) # Condición falsa para no devolver nada
-            else:
-                # Unir Factura con Propiedad para poder filtrar por Propiedad.propietario_id
-                # El joinedload anterior ayuda a cargar los datos, pero para el filtro, un join explícito es más claro.
-                # Si la relación Factura.propiedad_ref está bien definida, SQLAlchemy podría inferir el join
-                # al usar filter(Propiedad.propietario_id.in_(...)) después de un joinedload,
-                # pero ser explícito con .join() es más seguro.
-                query_facturas = query_facturas.join(Propiedad, Factura.propiedad_id == Propiedad.id)\
-                                               .filter(Propiedad.propietario_id.in_(assigned_owner_ids))
-        else:
-            current_app.logger.info("Usuario es ADMIN, mostrando todas las facturas.")
-        # --- FIN FILTRADO DE FACTURAS POR ROL ---
-
-        # 3. Aplicar ordenación
-        query_facturas = query_facturas.order_by(Factura.fecha_emision.desc(), Factura.id.desc())
-
-        # 4. Ejecutar la query (por ahora sin paginación, la obtendrá completa)
-        facturas_a_mostrar = query_facturas.all()
-        current_app.logger.info(f"Número de facturas recuperadas después del filtro de rol: {len(facturas_a_mostrar)}")
-
-
-        # 5. --- Cargar datos para los SELECTORES DE FILTRO y MODALES (Esta lógica ya estaba bien) ---
-        if current_user.role == 'admin':
-            propietarios_para_select = Propietario.query.order_by(Propietario.nombre).all()
-            inquilinos_para_select = Inquilino.query.order_by(Inquilino.nombre).all()
-            contratos_para_select = Contrato.query.options(joinedload(Contrato.propiedad_ref)).order_by(Contrato.numero_contrato).all()
-            propiedades_para_modales = Propiedad.query.order_by(Propiedad.direccion).all()
-        elif current_user.role == 'gestor': # Gestor ve sus propietarios en el filtro, y datos relacionados para modales
-            propietarios_para_select = sorted(current_user.propietarios_asignados, key=lambda p: p.nombre)
-            assigned_owner_ids_gestor = [p.id for p in current_user.propietarios_asignados]
-            if assigned_owner_ids_gestor:
-                inquilinos_para_select = db.session.query(Inquilino).join(Contrato).join(Propiedad).filter(Propiedad.propietario_id.in_(assigned_owner_ids_gestor)).distinct().order_by(Inquilino.nombre).all()
-                contratos_para_select = Contrato.query.join(Propiedad).filter(Propiedad.propietario_id.in_(assigned_owner_ids_gestor)).options(joinedload(Contrato.propiedad_ref)).order_by(Contrato.numero_contrato).all()
-                propiedades_para_modales = Propiedad.query.filter(Propiedad.propietario_id.in_(assigned_owner_ids_gestor)).order_by(Propiedad.direccion).all()
-            else:
-                inquilinos_para_select, contratos_para_select, propiedades_para_modales = [], [], []
-        elif current_user.role == 'usuario': # Usuario solo ve sus propietarios y datos relacionados
-            propietarios_para_select = sorted(current_user.propietarios_asignados, key=lambda p: p.nombre)
-            assigned_owner_ids_usuario = [p.id for p in current_user.propietarios_asignados]
-            if assigned_owner_ids_usuario:
-                inquilinos_para_select = db.session.query(Inquilino).join(Contrato).join(Propiedad).filter(Propiedad.propietario_id.in_(assigned_owner_ids_usuario)).distinct().order_by(Inquilino.nombre).all()
-                contratos_para_select = Contrato.query.join(Propiedad).filter(Propiedad.propietario_id.in_(assigned_owner_ids_usuario)).options(joinedload(Contrato.propiedad_ref)).order_by(Contrato.numero_contrato).all()
-                propiedades_para_modales = Propiedad.query.filter(Propiedad.propietario_id.in_(assigned_owner_ids_usuario)).order_by(Propiedad.direccion).all()
-            else:
-                inquilinos_para_select, contratos_para_select, propiedades_para_modales = [], [], []
-        # --- FIN Carga de datos para SELECTORES ---
+        # Datos filtrados automáticamente para los selectores y modales
+        propiedades_para_modales = get_filtered_propiedades().order_by(Propiedad.direccion).all()
+        inquilinos_para_select = get_filtered_inquilinos().order_by(Inquilino.nombre).all()
+        contratos_para_select = get_filtered_contratos(include_relations=True).order_by(Contrato.numero_contrato).all()
+        
+        # Propietarios disponibles del contexto automático
+        owner_context = get_active_owner_context()
+        propietarios_para_select = owner_context.get('available_owners', [])
 
     except Exception as e:
         flash(f"Error crítico al cargar datos de facturas: {e}", 'danger')
@@ -1025,16 +1014,24 @@ def borrar_facturas_masivo():
 
         return redirect(url_for('facturas_bp.borrar_facturas_masivo'))
 
-    # Para GET request
+    # Para GET request - Incluir propietario activo si existe
+    active_owner_context = get_active_owner_context()
+    preselected_owner_id = None
+    if active_owner_context and active_owner_context.get('active_owner'):
+        preselected_owner_id = active_owner_context['active_owner'].id
+    
     return render_template('reports/borrar_facturas_masivo.html',
                            title="Borrado Masivo de Facturas",
                            propietarios=propietarios_para_select,
                            contratos_json=json.dumps(contratos_para_select_json), # Pasar los contratos formateados para JS
                            csrf_form=csrf_form,
-                           meses=MESES_STR)
+                           meses=MESES_STR,
+                           preselected_owner_id=preselected_owner_id)
 
 
 @facturas_bp.route('/add', methods=['POST'])
+@role_required('admin', 'gestor')
+@with_owner_filtering(require_active_owner=False)
 def add_factura():
     """Crea una nueva factura manual."""
     iva_rate, irpf_rate = get_rates()
@@ -1146,7 +1143,8 @@ def mark_as_paid(id):
     return redirect(url_for('facturas_bp.listar_facturas'))
 
 @facturas_bp.route('/delete/<int:id>', methods=['POST'])
-@login_required 
+@role_required('admin', 'gestor')
+@validate_entity_access('factura', 'id')
 def delete_factura(id):
     inv = db.session.query(Factura).options(
         db.joinedload(Factura.contrato_ref),
@@ -1196,11 +1194,10 @@ def delete_factura(id):
 
 
 @facturas_bp.route('/ver/<int:id>', methods=['GET'])
-@login_required # Asegurar que el usuario está logueado
-# Descomenta y ajusta el decorador @owner_access_required si lo tienes y es aplicable
-# @owner_access_required()
+@login_required
+@filtered_detail_view('factura', 'id', log_queries=True)
 def ver_factura(id):
-    """Muestra la página de detalle de una factura, verificando permisos."""
+    """Muestra la página de detalle de una factura con validación automática de acceso."""
     csrf_form = CSRFOnlyForm()  # Para el botón de email en el template
     inv = None
     propietario_emisor = None
@@ -1209,25 +1206,10 @@ def ver_factura(id):
     irpf_rate = DEFAULT_IRPF_RATE
 
     try:
-        # 1. Obtener la factura y sus relaciones principales
-        # get_or_404 lanzará un error 404 si la factura no existe.
-        inv = db.session.query(Factura).options(
-            joinedload(Factura.inquilino_ref),
-            joinedload(Factura.propiedad_ref).joinedload(Propiedad.propietario_ref), # Carga anidada propietario
-            joinedload(Factura.contrato_ref)
-        ).get_or_404(id)
-
-        # 2. VERIFICACIÓN DE PERMISO (Esencial)
-        # Si get_or_404 no falló, la factura 'inv' existe.
-        if current_user.role != 'admin':
-            # Verificar si la factura tiene una propiedad asociada
-            if not inv.propiedad_ref:
-                current_app.logger.warning(f"Intento de acceso a factura {inv.id} sin propiedad por usuario {current_user.username}")
-                flash("Error: La factura no está asociada a una propiedad válida.", "danger")
-                return redirect(url_for('facturas_bp.listar_facturas'))
-
-            # Verificar si el propietario de la propiedad está en los asignados al usuario
-            assigned_owner_ids = {p.id for p in current_user.propietarios_asignados}
+        # La validación de acceso ya se hizo automáticamente
+        inv = OwnerFilteredQueries.get_factura_by_id(id, include_relations=True)
+        if not inv:
+            abort(404)
             if inv.propiedad_ref.propietario_id not in assigned_owner_ids:
                  flash("No tienes permiso para ver esta factura.", "danger")
                  current_app.logger.warning(f"Acceso denegado a factura {inv.id} para usuario {current_user.username}. Propietario no asignado.")
@@ -1310,11 +1292,13 @@ def download_factura(id):
         return redirect(url_for('facturas_bp.ver_factura', id=id))
 
 @facturas_bp.route('/edit/<int:id>', methods=['POST'])
-@login_required
+@role_required('admin', 'gestor')
+@validate_entity_access('factura', 'id')
 def edit_factura(id):
-    inv = db.session.get(Factura, id)
+    # La validación de acceso ya se hizo automáticamente
+    inv = OwnerFilteredQueries.get_factura_by_id(id, include_relations=True)
     if not inv:
-        flash('Factura no encontrada.', 'warning')
+        flash('Factura no encontrada o sin acceso.', 'warning')
         return redirect(url_for('facturas_bp.listar_facturas'))
 
     if inv.estado == 'cancelada':
@@ -1532,7 +1516,7 @@ def gestionar_gastos():
                 joinedload(Contrato.inquilino_ref)
             ).order_by(Contrato.numero_contrato).all()
         elif current_user.role in ['gestor', 'usuario']:
-            propietarios = current_user.propietarios_asignados # Ya es una lista
+            propietarios = list(current_user.propietarios_asignados) # Convertir a lista real
             assigned_owner_ids = [p.id for p in propietarios]
             if assigned_owner_ids:
                 contratos_todos = db.session.query(Contrato).join(Propiedad).filter(
@@ -1562,10 +1546,25 @@ def gestionar_gastos():
         flash(f"Error al cargar los datos de gastos: {e_get}", 'danger')
         current_app.logger.error(f"Error en GET /gastos: {e_get}", exc_info=True)
         propietarios, contratos_todos, gastos = [], [], []
+    # Incluir propietario activo si existe
+    active_owner_context = get_active_owner_context()
+    preselected_owner_id = None
+    
+    if active_owner_context and active_owner_context.get('active_owner'):
+        active_owner = active_owner_context['active_owner']
+        preselected_owner_id = active_owner.id
+        
+        # Asegurar que el propietario activo esté en la lista de propietarios
+        # Si no está, agregarlo (para casos donde admin selecciona propietario no asignado)
+        propietarios_ids = [p.id for p in propietarios]
+        if preselected_owner_id not in propietarios_ids:
+            propietarios.append(active_owner)
+    
     return render_template(
         'gastos.html', title="Gestión de Gastos",
         propietarios=propietarios, contratos=contratos_todos,
-        gastos=gastos, csrf_form=csrf_form
+        gastos=gastos, csrf_form=csrf_form,
+        preselected_owner_id=preselected_owner_id
     )
 
 

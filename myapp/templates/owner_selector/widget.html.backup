@@ -1,0 +1,215 @@
+<!-- Widget de Selector de Propietario Activo - Versión Mejorada -->
+<div id="ownerSelectorWidget" class="bg-gradient-to-r from-blue-500 to-blue-600 dark:from-blue-700 dark:to-blue-800 rounded-xl shadow-lg border border-blue-200 dark:border-blue-600 overflow-hidden">
+    {% if has_active_owner %}
+        <div class="flex items-center justify-between">
+            <div class="flex-1">
+                <span class="text-xs text-gray-500 dark:text-gray-400 block mb-1">Propietario activo:</span>
+                <div class="font-semibold text-gray-800 dark:text-gray-200 flex items-center">
+                    <i class="fas fa-user-tie text-blue-500 mr-2"></i>
+                    {{ active_owner.nombre }}
+                </div>
+            </div>
+            
+            {% if can_change_owner %}
+                <div class="relative">
+                    <button class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md text-sm transition-colors dropdown-button" 
+                            type="button" 
+                            id="ownerDropdown">
+                        <i class="fas fa-exchange-alt"></i>
+                    </button>
+                    <div class="absolute right-0 mt-2 w-64 bg-white dark:bg-gray-800 rounded-md shadow-lg border border-gray-200 dark:border-gray-600 z-50 hidden" 
+                         id="ownerDropdownMenu">
+                        <div class="py-1">
+                            <div class="px-4 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-700">
+                                Cambiar a:
+                            </div>
+                            {% for owner in available_owners %}
+                                {% if owner.id != active_owner.id %}
+                                    <a href="#" 
+                                       class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 owner-change-link" 
+                                       data-owner-id="{{ owner.id }}"
+                                       data-owner-name="{{ owner.nombre }}">
+                                        <div class="flex items-center">
+                                            <i class="fas fa-user-tie text-blue-500 mr-2"></i>
+                                            <div>
+                                                <div class="font-medium">{{ owner.nombre }}</div>
+                                                <div class="text-xs text-gray-500 dark:text-gray-400">{{ owner.nif }}</div>
+                                            </div>
+                                        </div>
+                                    </a>
+                                {% endif %}
+                            {% endfor %}
+                            <div class="border-t border-gray-100 dark:border-gray-700 mt-1 pt-1">
+                                <a href="{{ url_for('owner_selector_bp.select_owner') }}" 
+                                   class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">
+                                    <i class="fas fa-cog mr-2"></i>
+                                    Gestionar selección
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    {% else %}
+        <div class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-md p-3">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center">
+                    <i class="fas fa-exclamation-triangle text-yellow-500 mr-2"></i>
+                    <span class="text-sm text-yellow-800 dark:text-yellow-200">No hay propietario seleccionado</span>
+                </div>
+                <a href="{{ url_for('owner_selector_bp.select_owner') }}" 
+                   class="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded-md text-sm transition-colors">
+                    <i class="fas fa-user-plus mr-1"></i> Seleccionar
+                </a>
+            </div>
+        </div>
+    {% endif %}
+</div>
+
+<!-- Loading indicator -->
+<div id="ownerChangeLoading" class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg p-3 mb-4 hidden">
+    <div class="flex items-center">
+        <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500 mr-2"></div>
+        <span class="text-sm text-gray-600 dark:text-gray-400">Cambiando propietario...</span>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const widget = document.getElementById('ownerSelectorWidget');
+    const loadingIndicator = document.getElementById('ownerChangeLoading');
+    const changeLinks = document.querySelectorAll('.owner-change-link');
+    const dropdownButton = document.getElementById('ownerDropdown');
+    const dropdownMenu = document.getElementById('ownerDropdownMenu');
+    
+    // Funcionalidad del dropdown manual
+    if (dropdownButton && dropdownMenu) {
+        dropdownButton.addEventListener('click', function(e) {
+            e.stopPropagation();
+            dropdownMenu.classList.toggle('hidden');
+        });
+        
+        // Cerrar dropdown al hacer click fuera
+        document.addEventListener('click', function(e) {
+            if (!dropdownButton.contains(e.target) && !dropdownMenu.contains(e.target)) {
+                dropdownMenu.classList.add('hidden');
+            }
+        });
+    }
+    
+    // Función para mostrar/ocultar loading
+    function toggleLoading(show) {
+        if (show) {
+            widget.classList.add('hidden');
+            loadingIndicator.classList.remove('hidden');
+        } else {
+            widget.classList.remove('hidden');
+            loadingIndicator.classList.add('hidden');
+        }
+    }
+    
+    // Función para mostrar notificaciones usando Tailwind
+    function showNotification(message, type = 'success') {
+        // Crear contenedor de notificaciones si no existe
+        let notificationContainer = document.getElementById('notificationContainer');
+        if (!notificationContainer) {
+            notificationContainer = document.createElement('div');
+            notificationContainer.id = 'notificationContainer';
+            notificationContainer.className = 'fixed top-4 right-4 z-50 space-y-2';
+            document.body.appendChild(notificationContainer);
+        }
+        
+        // Crear la notificación
+        const notificationId = 'notification-' + Date.now();
+        const bgColor = type === 'success' ? 'bg-green-500' : 'bg-red-500';
+        const notificationHtml = `
+            <div id="${notificationId}" class="${bgColor} text-white px-6 py-4 rounded-lg shadow-lg transform transition-all duration-300 translate-x-full opacity-0">
+                <div class="flex items-center justify-between">
+                    <span class="text-sm font-medium">${message}</span>
+                    <button onclick="removeNotification('${notificationId}')" class="ml-4 text-white hover:text-gray-200">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        notificationContainer.insertAdjacentHTML('beforeend', notificationHtml);
+        const notificationElement = document.getElementById(notificationId);
+        
+        // Animar entrada
+        setTimeout(() => {
+            notificationElement.classList.remove('translate-x-full', 'opacity-0');
+        }, 100);
+        
+        // Auto-remover después de 5 segundos
+        setTimeout(() => {
+            removeNotification(notificationId);
+        }, 5000);
+    }
+    
+    // Función global para remover notificaciones
+    window.removeNotification = function(notificationId) {
+        const notification = document.getElementById(notificationId);
+        if (notification) {
+            notification.classList.add('translate-x-full', 'opacity-0');
+            setTimeout(() => {
+                notification.remove();
+            }, 300);
+        }
+    };
+    
+    // Agregar listeners a los enlaces de cambio
+    changeLinks.forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            
+            const ownerId = this.dataset.ownerId;
+            const ownerName = this.dataset.ownerName;
+            
+            if (!ownerId) {
+                console.error('ID de propietario no encontrado');
+                return;
+            }
+            
+            // Cerrar dropdown
+            if (dropdownMenu) {
+                dropdownMenu.classList.add('hidden');
+            }
+            
+            // Mostrar loading
+            toggleLoading(true);
+            
+            // Realizar petición AJAX
+            fetch('{{ url_for("owner_selector_bp.api_change_owner") }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify({
+                    propietario_id: parseInt(ownerId)
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification(data.message, 'success');
+                    // Recargar la página para actualizar el contenido
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                } else {
+                    showNotification(data.message || 'Error al cambiar propietario', 'error');
+                    toggleLoading(false);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showNotification('Error de conexión al cambiar propietario', 'error');
+                toggleLoading(false);
+            });
+        });
+    });
+});
+</script>
