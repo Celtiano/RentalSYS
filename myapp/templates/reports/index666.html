@@ -15,70 +15,123 @@
         </div>
     </div>
 
-    <!-- Propietario Activo Info -->
-    {% if active_owner %}
-    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-        <div class="flex items-center">
-            <i class="fas fa-user-check text-blue-500 text-xl mr-3"></i>
-            <div>
-                <h3 class="text-lg font-medium text-blue-800">Propietario Activo</h3>
-                <p class="text-blue-700">{{ active_owner.nombre }} - Todas las exportaciones se filtrarán por este propietario</p>
-            </div>
-        </div>
-    </div>
-    {% endif %}
-
     <!-- Tipos de Informes -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
         
         <!-- Exportar Facturas -->
-        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-xl transition-shadow duration-300">
             <div class="bg-gradient-to-r from-blue-500 to-blue-600 p-4">
                 <div class="flex items-center justify-center w-12 h-12 bg-white/20 rounded-full mb-3">
                     <i class="fas fa-file-excel text-white text-xl"></i>
                 </div>
                 <h3 class="text-xl font-bold text-white mb-2">Exportar Facturas</h3>
-                <p class="text-blue-100 text-sm">Exporta facturas a formato Excel</p>
+                <p class="text-blue-100 text-sm">Exporta facturas a formato Excel con datos detallados</p>
             </div>
             <div class="p-6">
+                <div class="space-y-3 text-sm text-gray-600 dark:text-gray-400 mb-6">
+                    <div class="flex items-center">
+                        <i class="fas fa-check text-green-500 mr-2"></i>
+                        <span>Formato Excel (XLSX)</span>
+                    </div>
+                    <div class="flex items-center">
+                        <i class="fas fa-check text-green-500 mr-2"></i>
+                        <span>Datos completos de facturación</span>
+                    </div>
+                    <div class="flex items-center">
+                        <i class="fas fa-check text-green-500 mr-2"></i>
+                        <span>Filtros por fecha y propietario</span>
+                    </div>
+                    <div class="flex items-center">
+                        <i class="fas fa-check text-green-500 mr-2"></i>
+                        <span>Totales automáticos</span>
+                    </div>
+                </div>
                 <button onclick="openModal('exportarFacturasModal')" 
-                        class="w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-3 rounded-lg transition-colors font-medium">
+                        class="w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-3 rounded-lg transition-colors font-medium"
+                        title="Requiere librería xlsxwriter">
                     <i class="fas fa-download mr-2"></i>
                     Exportar Facturas
                 </button>
+                <p class="text-xs text-gray-500 mt-2 text-center">
+                    <i class="fas fa-info-circle mr-1"></i>
+                    Requiere: <code>pip install xlsxwriter</code>
+                </p>
             </div>
         </div>
 
         <!-- Listado de Facturación -->
-        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-xl transition-shadow duration-300">
             <div class="bg-gradient-to-r from-green-500 to-green-600 p-4">
                 <div class="flex items-center justify-center w-12 h-12 bg-white/20 rounded-full mb-3">
                     <i class="fas fa-file-pdf text-white text-xl"></i>
                 </div>
                 <h3 class="text-xl font-bold text-white mb-2">Listado de Facturación</h3>
-                <p class="text-green-100 text-sm">Genera listado con vista previa y PDF</p>
+                <p class="text-green-100 text-sm">Genera listado detallado por propietario y contrato</p>
             </div>
             <div class="p-6">
+                <div class="space-y-3 text-sm text-gray-600 dark:text-gray-400 mb-6">
+                    <div class="flex items-center">
+                        <i class="fas fa-check text-green-500 mr-2"></i>
+                        <span>Visualización previa</span>
+                    </div>
+                    <div class="flex items-center">
+                        <i class="fas fa-check text-green-500 mr-2"></i>
+                        <span>Agrupado por contrato</span>
+                    </div>
+                    <div class="flex items-center">
+                        <i class="fas fa-check text-green-500 mr-2"></i>
+                        <span>Generación PDF</span>
+                    </div>
+                    <div class="flex items-center">
+                        <i class="fas fa-check text-green-500 mr-2"></i>
+                        <span>Totales por secciones</span>
+                    </div>
+                </div>
                 <button onclick="openModal('listadoFacturacionModal')" 
-                        class="w-full bg-green-500 hover:bg-green-600 text-white px-4 py-3 rounded-lg transition-colors font-medium">
+                        class="w-full bg-green-500 hover:bg-green-600 text-white px-4 py-3 rounded-lg transition-colors font-medium"
+                        title="Generación PDF requiere librería reportlab">
                     <i class="fas fa-list mr-2"></i>
                     Generar Listado
+                </button>
+                <p class="text-xs text-gray-500 mt-2 text-center">
+                    <i class="fas fa-info-circle mr-1"></i>
+                    PDF requiere: <code>pip install reportlab</code>
+                </p>
+            </div>
+        </div>
+
+        <!-- Próximamente -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden opacity-60">
+            <div class="bg-gradient-to-r from-gray-400 to-gray-500 p-4">
+                <div class="flex items-center justify-center w-12 h-12 bg-white/20 rounded-full mb-3">
+                    <i class="fas fa-plus text-white text-xl"></i>
+                </div>
+                <h3 class="text-xl font-bold text-white mb-2">Más Informes</h3>
+                <p class="text-gray-200 text-sm">Próximamente más tipos de informes</p>
+            </div>
+            <div class="p-6">
+                <div class="space-y-3 text-sm text-gray-600 dark:text-gray-400 mb-6">
+                    <div class="flex items-center">
+                        <i class="fas fa-clock text-gray-400 mr-2"></i>
+                        <span>Informes de inquilinos</span>
+                    </div>
+                    <div class="flex items-center">
+                        <i class="fas fa-clock text-gray-400 mr-2"></i>
+                        <span>Informes de propiedades</span>
+                    </div>
+                    <div class="flex items-center">
+                        <i class="fas fa-clock text-gray-400 mr-2"></i>
+                        <span>Informes financieros</span>
+                    </div>
+                </div>
+                <button disabled 
+                        class="w-full bg-gray-300 text-gray-500 px-4 py-3 rounded-lg cursor-not-allowed font-medium">
+                    <i class="fas fa-clock mr-2"></i>
+                    Próximamente
                 </button>
             </div>
         </div>
     </div>
-    
-    <!-- Debug Info (Solo en desarrollo) -->
-    {% if config.DEBUG %}
-    <div class="mt-8 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-        <h4 class="font-bold text-yellow-800">🔧 Debug Info</h4>
-        <p class="text-yellow-700">Propietarios disponibles: {{ propietarios|length }}</p>
-        {% if active_owner %}
-        <p class="text-yellow-700">Propietario activo: {{ active_owner.nombre }} (ID: {{ active_owner.id }})</p>
-        <p><a href="/reports/debug-listado/{{ active_owner.id }}" class="text-blue-600 underline">🧪 Test Debug Listado</a></p>
-        {% endif %}
-    </div>
-    {% endif %}
 </div>
 
 <!-- Modal: Exportar Facturas -->
@@ -103,31 +156,27 @@
                             
                             <div class="space-y-4">
                                 <!-- Propietario -->
-                                {% if preselected_owner_id %}
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                        Propietario (Activo)
-                                    </label>
-                                    <div class="form-input w-full text-sm bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-600 text-gray-800 dark:text-gray-200 flex items-center py-2.5">
-                                        <span class="text-green-600 dark:text-green-400 mr-2">✓</span>
-                                        <span class="font-medium">{{ active_owner.nombre }}</span>
-                                    </div>
-                                    <input type="hidden" name="propietario_id" value="{{ preselected_owner_id }}">
-                                </div>
-                                {% else %}
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                         Propietario
                                     </label>
-                                    <select name="propietario_id" required class="form-input w-full text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200">
-                                        <option value="">— Seleccionar Propietario —</option>
-                                        {% for prop in propietarios %}
-                                            <option value="{{ prop.id }}">{{ prop.nombre }}</option>
-                                        {% endfor %}
-                                    </select>
+                                    {% if preselected_owner_id %}
+                                        <div class="form-input w-full text-sm bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-600 text-gray-800 dark:text-gray-200 flex items-center py-2.5">
+                                            <span class="text-green-600 dark:text-green-400 mr-2">✓</span>
+                                            <span class="font-medium">{{ active_owner.nombre }}</span>
+                                            <span class="ml-2 text-xs text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-800 px-2 py-0.5 rounded">(Activo)</span>
+                                        </div>
+                                        <input type="hidden" name="propietario_id" value="{{ preselected_owner_id }}">
+                                    {% else %}
+                                        <select name="propietario_id" class="form-input w-full text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200">
+                                            <option value="todos">Todos los propietarios</option>
+                                            {% for prop in propietarios %}
+                                                <option value="{{ prop.id }}">{{ prop.nombre }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    {% endif %}
                                 </div>
-                                {% endif %}
-                                
+
                                 <!-- Fechas -->
                                 <div class="grid grid-cols-2 gap-4">
                                     <div>
@@ -144,6 +193,20 @@
                                         <input type="date" name="fecha_hasta" required 
                                                class="form-input w-full text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200">
                                     </div>
+                                </div>
+
+                                <!-- Estado -->
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Estado de Factura
+                                    </label>
+                                    <select name="estado_factura" class="form-input w-full text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200">
+                                        <option value="todos">Todos los estados</option>
+                                        <option value="Pendiente">Pendiente</option>
+                                        <option value="Enviada">Enviada</option>
+                                        <option value="Pagada">Pagada</option>
+                                        <option value="Cancelada">Cancelada</option>
+                                    </select>
                                 </div>
                             </div>
                         </div>
@@ -187,59 +250,55 @@
                             
                             <div class="space-y-4">
                                 <!-- Propietario -->
-                                {% if preselected_owner_id %}
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                        Propietario (Activo)
+                                        Propietario <span class="text-red-500">*</span>
                                     </label>
-                                    <div class="form-input w-full text-sm bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-600 text-gray-800 dark:text-gray-200 flex items-center py-2.5">
-                                        <span class="text-green-600 dark:text-green-400 mr-2">✓</span>
-                                        <span class="font-medium">{{ active_owner.nombre }}</span>
-                                        <span class="ml-2 text-xs text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-800 px-2 py-0.5 rounded">(Activo)</span>
-                                    </div>
-                                    <input type="hidden" name="propietario_id" value="{{ preselected_owner_id }}">
+                                    {% if preselected_owner_id %}
+                                        <div class="form-input w-full text-sm bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-600 text-gray-800 dark:text-gray-200 flex items-center py-2.5">
+                                            <span class="text-green-600 dark:text-green-400 mr-2">✓</span>
+                                            <span class="font-medium">{{ active_owner.nombre }}</span>
+                                            <span class="ml-2 text-xs text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-800 px-2 py-0.5 rounded">(Activo)</span>
+                                        </div>
+                                        <input type="hidden" name="propietario_id" value="{{ preselected_owner_id }}">
+                                    {% else %}
+                                        <select name="propietario_id" required class="form-input w-full text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200">
+                                            <option value="">— Seleccionar Propietario —</option>
+                                            {% for prop in propietarios %}
+                                                <option value="{{ prop.id }}">{{ prop.nombre }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    {% endif %}
                                 </div>
-                                {% else %}
+
+                                <!-- Contratos -->
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                        Propietario *
+                                        Contratos
                                     </label>
-                                    <select name="propietario_id" required class="form-input w-full text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200">
-                                        <option value="">— Seleccionar Propietario —</option>
-                                        {% for prop in propietarios %}
-                                            <option value="{{ prop.id }}">{{ prop.nombre }}</option>
-                                        {% endfor %}
+                                    <select name="contrato_ids" multiple class="form-input w-full text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200" size="3">
+                                        <option value="todos" selected>Todos los contratos</option>
+                                        <!-- Los contratos se cargarán dinámicamente via AJAX -->
                                     </select>
+                                    <p class="text-xs text-gray-500 mt-1">Mantén Ctrl para seleccionar múltiples contratos</p>
                                 </div>
-                                {% endif %}
-                                
+
                                 <!-- Fechas -->
                                 <div class="grid grid-cols-2 gap-4">
                                     <div>
                                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                            Fecha Desde *
+                                            Fecha Desde <span class="text-red-500">*</span>
                                         </label>
                                         <input type="date" name="fecha_desde" required 
                                                class="form-input w-full text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200">
                                     </div>
                                     <div>
                                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                            Fecha Hasta *
+                                            Fecha Hasta <span class="text-red-500">*</span>
                                         </label>
                                         <input type="date" name="fecha_hasta" required 
                                                class="form-input w-full text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200">
                                     </div>
-                                </div>
-                                
-                                <!-- Contratos -->
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                        Contratos
-                                    </label>
-                                    <select name="contrato_ids" class="form-input w-full text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200">
-                                        <option value="todos" selected>Todos los contratos</option>
-                                    </select>
-                                    <p class="text-xs text-gray-500 mt-1">Por defecto se incluyen todos los contratos</p>
                                 </div>
                             </div>
                         </div>
@@ -262,29 +321,9 @@
 </div>
 
 <script>
-// Funciones simples para modales
+// Funciones para modales
 function openModal(modalId) {
     document.getElementById(modalId).classList.remove('hidden');
-    
-    // Inicializar fechas por defecto
-    const hoy = new Date();
-    const primerDiaMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
-    const ultimoDiaMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0);
-    
-    const fechaDesde = primerDiaMes.toISOString().split('T')[0];
-    const fechaHasta = ultimoDiaMes.toISOString().split('T')[0];
-    
-    // Aplicar fechas por defecto si están vacías
-    const modal = document.getElementById(modalId);
-    const fechaDesdeInput = modal.querySelector('input[name="fecha_desde"]');
-    const fechaHastaInput = modal.querySelector('input[name="fecha_hasta"]');
-    
-    if (fechaDesdeInput && !fechaDesdeInput.value) {
-        fechaDesdeInput.value = fechaDesde;
-    }
-    if (fechaHastaInput && !fechaHastaInput.value) {
-        fechaHastaInput.value = fechaHasta;
-    }
 }
 
 function closeModal(modalId) {
@@ -301,10 +340,7 @@ document.addEventListener('click', function(e) {
     }
 });
 
-// Debug info
-console.log('Reports page loaded successfully');
-{% if active_owner %}
-console.log('Active owner: {{ active_owner.nombre }} (ID: {{ active_owner.id }})');
-{% endif %}
+// Cargar contratos cuando se selecciona propietario (para el listado de facturación)
+// TODO: Implementar carga dinámica de contratos via AJAX
 </script>
 {% endblock %}

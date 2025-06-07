@@ -16,8 +16,11 @@ def role_required(*roles):
                 flash("Debes iniciar sesión para acceder a esta página.", "warning")
                 return redirect(url_for('auth_bp.login', next=request.url))
 
-            if current_user.role not in roles:
-                print(f"Acceso denegado a {current_user.username}. Rol requerido: {roles}, Rol actual: {current_user.role}")
+            # Manejar tanto listas como argumentos separados
+            allowed_roles = roles[0] if len(roles) == 1 and isinstance(roles[0], (list, tuple)) else roles
+            
+            if current_user.role not in allowed_roles:
+                print(f"Acceso denegado a {current_user.username}. Rol requerido: {allowed_roles}, Rol actual: {current_user.role}")
                 flash("No tienes permiso para acceder a esta página.", "danger")
                 # Redirigir al dashboard o a donde sea apropiado
                 return redirect(url_for('main_bp.dashboard'))

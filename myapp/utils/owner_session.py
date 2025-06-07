@@ -269,8 +269,10 @@ def get_active_owner_context():
     Returns:
         dict: Diccionario con información del propietario activo y disponibles
     """
+    active_owner = get_active_owner()
     context = {
-        'active_owner': get_active_owner(),
+        'active_owner': active_owner,
+        'active_owner_id': active_owner.id if active_owner else None,
         'available_owners': get_user_available_owners(),
         'has_active_owner': has_active_owner(),
         'can_change_owner': len(get_user_available_owners()) > 1
