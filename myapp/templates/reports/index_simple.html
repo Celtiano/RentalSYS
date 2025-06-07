@@ -15,18 +15,7 @@
         </div>
     </div>
 
-    <!-- Propietario Activo Info -->
-    {% if active_owner %}
-    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-        <div class="flex items-center">
-            <i class="fas fa-user-check text-blue-500 text-xl mr-3"></i>
-            <div>
-                <h3 class="text-lg font-medium text-blue-800">Propietario Activo</h3>
-                <p class="text-blue-700">{{ active_owner.nombre }} - Todas las exportaciones se filtrarán por este propietario</p>
-            </div>
-        </div>
-    </div>
-    {% endif %}
+
 
     <!-- Tipos de Informes -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
@@ -67,18 +56,7 @@
             </div>
         </div>
     </div>
-    
-    <!-- Debug Info (Solo en desarrollo) -->
-    {% if config.DEBUG %}
-    <div class="mt-8 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-        <h4 class="font-bold text-yellow-800">🔧 Debug Info</h4>
-        <p class="text-yellow-700">Propietarios disponibles: {{ propietarios|length }}</p>
-        {% if active_owner %}
-        <p class="text-yellow-700">Propietario activo: {{ active_owner.nombre }} (ID: {{ active_owner.id }})</p>
-        <p><a href="/reports/debug-listado/{{ active_owner.id }}" class="text-blue-600 underline">🧪 Test Debug Listado</a></p>
-        {% endif %}
-    </div>
-    {% endif %}
+
 </div>
 
 <!-- Modal: Exportar Facturas -->

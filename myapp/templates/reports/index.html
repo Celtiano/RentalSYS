@@ -15,18 +15,7 @@
         </div>
     </div>
 
-    <!-- Propietario Activo Info -->
-    {% if active_owner %}
-    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-        <div class="flex items-center">
-            <i class="fas fa-user-check text-blue-500 text-xl mr-3"></i>
-            <div>
-                <h3 class="text-lg font-medium text-blue-800">Propietario Activo</h3>
-                <p class="text-blue-700">{{ active_owner.nombre }} - Todas las exportaciones se filtrarán por este propietario</p>
-            </div>
-        </div>
-    </div>
-    {% endif %}
+
 
     <!-- Tipos de Informes -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
@@ -67,18 +56,7 @@
             </div>
         </div>
     </div>
-    
-    <!-- Debug Info (Solo en desarrollo) -->
-    {% if config.DEBUG %}
-    <div class="mt-8 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-        <h4 class="font-bold text-yellow-800">🔧 Debug Info</h4>
-        <p class="text-yellow-700">Propietarios disponibles: {{ propietarios|length }}</p>
-        {% if active_owner %}
-        <p class="text-yellow-700">Propietario activo: {{ active_owner.nombre }} (ID: {{ active_owner.id }})</p>
-        <p><a href="/reports/debug-listado/{{ active_owner.id }}" class="text-blue-600 underline">🧪 Test Debug Listado</a></p>
-        {% endif %}
-    </div>
-    {% endif %}
+
 </div>
 
 <!-- Modal: Exportar Facturas -->
@@ -134,15 +112,46 @@
                                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                             Fecha Desde
                                         </label>
-                                        <input type="date" name="fecha_desde" required 
+                                        <input type="date" id="fecha_desde_excel" name="fecha_desde" required 
                                                class="form-input w-full text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200">
                                     </div>
                                     <div>
                                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                             Fecha Hasta
                                         </label>
-                                        <input type="date" name="fecha_hasta" required 
+                                        <input type="date" id="fecha_hasta_excel" name="fecha_hasta" required 
                                                class="form-input w-full text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200">
+                                    </div>
+                                </div>
+                                
+                                <!-- Botones de Fecha Rápida -->
+                                <div class="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4">
+                                    <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Rangos de fecha rápidos:</h4>
+                                    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
+                                        <button type="button" onclick="setDateRangeExcel('1T')" 
+                                                class="px-3 py-2 text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                                            1T
+                                        </button>
+                                        <button type="button" onclick="setDateRangeExcel('2T')" 
+                                                class="px-3 py-2 text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                                            2T
+                                        </button>
+                                        <button type="button" onclick="setDateRangeExcel('3T')" 
+                                                class="px-3 py-2 text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                                            3T
+                                        </button>
+                                        <button type="button" onclick="setDateRangeExcel('4T')" 
+                                                class="px-3 py-2 text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                                            4T
+                                        </button>
+                                        <button type="button" onclick="setDateRangeExcel('thisMonth')" 
+                                                class="px-3 py-2 text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                                            Mes
+                                        </button>
+                                        <button type="button" onclick="setDateRangeExcel('thisYear')" 
+                                                class="px-3 py-2 text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                                            Año
+                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -219,15 +228,46 @@
                                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                             Fecha Desde *
                                         </label>
-                                        <input type="date" name="fecha_desde" required 
+                                        <input type="date" id="fecha_desde_listado" name="fecha_desde" required 
                                                class="form-input w-full text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200">
                                     </div>
                                     <div>
                                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                             Fecha Hasta *
                                         </label>
-                                        <input type="date" name="fecha_hasta" required 
+                                        <input type="date" id="fecha_hasta_listado" name="fecha_hasta" required 
                                                class="form-input w-full text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200">
+                                    </div>
+                                </div>
+                                
+                                <!-- Botones de Fecha Rápida -->
+                                <div class="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4">
+                                    <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Rangos de fecha rápidos:</h4>
+                                    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
+                                        <button type="button" onclick="setDateRangeListado('1T')" 
+                                                class="px-3 py-2 text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                                            1T
+                                        </button>
+                                        <button type="button" onclick="setDateRangeListado('2T')" 
+                                                class="px-3 py-2 text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                                            2T
+                                        </button>
+                                        <button type="button" onclick="setDateRangeListado('3T')" 
+                                                class="px-3 py-2 text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                                            3T
+                                        </button>
+                                        <button type="button" onclick="setDateRangeListado('4T')" 
+                                                class="px-3 py-2 text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                                            4T
+                                        </button>
+                                        <button type="button" onclick="setDateRangeListado('thisMonth')" 
+                                                class="px-3 py-2 text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                                            Mes
+                                        </button>
+                                        <button type="button" onclick="setDateRangeListado('thisYear')" 
+                                                class="px-3 py-2 text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                                            Año
+                                        </button>
                                     </div>
                                 </div>
                                 
@@ -300,6 +340,116 @@ document.addEventListener('click', function(e) {
         });
     }
 });
+
+// Función para establecer rangos de fecha rápidos en el modal de Excel
+function setDateRangeExcel(range) {
+    const fechaDesdeInput = document.getElementById('fecha_desde_excel');
+    const fechaHastaInput = document.getElementById('fecha_hasta_excel');
+    
+    if (!fechaDesdeInput || !fechaHastaInput) return;
+
+    const today = new Date();
+    const currentYear = today.getFullYear();
+    let startDate, endDate;
+
+    switch(range) {
+        case '1T': // Primer trimestre: 01/01 a 31/03
+            startDate = new Date(currentYear, 0, 1); // 1 enero
+            endDate = new Date(currentYear, 2, 31); // 31 marzo
+            break;
+        case '2T': // Segundo trimestre: 01/04 a 30/06
+            startDate = new Date(currentYear, 3, 1); // 1 abril
+            endDate = new Date(currentYear, 5, 30); // 30 junio
+            break;
+        case '3T': // Tercer trimestre: 01/07 a 30/09
+            startDate = new Date(currentYear, 6, 1); // 1 julio
+            endDate = new Date(currentYear, 8, 30); // 30 septiembre
+            break;
+        case '4T': // Cuarto trimestre: 01/10 a 31/12
+            startDate = new Date(currentYear, 9, 1); // 1 octubre
+            endDate = new Date(currentYear, 11, 31); // 31 diciembre
+            break;
+        case 'thisMonth': // Del 01 del mes actual al último día del mes actual
+            startDate = new Date(currentYear, today.getMonth(), 1);
+            endDate = new Date(currentYear, today.getMonth() + 1, 0); // Último día del mes
+            break;
+        case 'thisYear': // Del 01/01 al 31/12 del año actual
+            startDate = new Date(currentYear, 0, 1); // 1 enero
+            endDate = new Date(currentYear, 11, 31); // 31 diciembre
+            break;
+        default:
+            return;
+    }
+
+    // Formatear fechas manualmente para evitar problemas de zona horaria
+    const formatDate = (date) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
+    fechaDesdeInput.value = formatDate(startDate);
+    fechaHastaInput.value = formatDate(endDate);
+
+    // Mostrar feedback visual (opcional)
+    console.log(`Rango de fechas actualizado: ${range} (${formatDate(startDate)} - ${formatDate(endDate)})`);
+}
+
+// Función para establecer rangos de fecha rápidos en el modal de Listado de Facturación
+function setDateRangeListado(range) {
+    const fechaDesdeInput = document.getElementById('fecha_desde_listado');
+    const fechaHastaInput = document.getElementById('fecha_hasta_listado');
+    
+    if (!fechaDesdeInput || !fechaHastaInput) return;
+
+    const today = new Date();
+    const currentYear = today.getFullYear();
+    let startDate, endDate;
+
+    switch(range) {
+        case '1T': // Primer trimestre: 01/01 a 31/03
+            startDate = new Date(currentYear, 0, 1); // 1 enero
+            endDate = new Date(currentYear, 2, 31); // 31 marzo
+            break;
+        case '2T': // Segundo trimestre: 01/04 a 30/06
+            startDate = new Date(currentYear, 3, 1); // 1 abril
+            endDate = new Date(currentYear, 5, 30); // 30 junio
+            break;
+        case '3T': // Tercer trimestre: 01/07 a 30/09
+            startDate = new Date(currentYear, 6, 1); // 1 julio
+            endDate = new Date(currentYear, 8, 30); // 30 septiembre
+            break;
+        case '4T': // Cuarto trimestre: 01/10 a 31/12
+            startDate = new Date(currentYear, 9, 1); // 1 octubre
+            endDate = new Date(currentYear, 11, 31); // 31 diciembre
+            break;
+        case 'thisMonth': // Del 01 del mes actual al último día del mes actual
+            startDate = new Date(currentYear, today.getMonth(), 1);
+            endDate = new Date(currentYear, today.getMonth() + 1, 0); // Último día del mes
+            break;
+        case 'thisYear': // Del 01/01 al 31/12 del año actual
+            startDate = new Date(currentYear, 0, 1); // 1 enero
+            endDate = new Date(currentYear, 11, 31); // 31 diciembre
+            break;
+        default:
+            return;
+    }
+
+    // Formatear fechas manualmente para evitar problemas de zona horaria
+    const formatDate = (date) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
+    fechaDesdeInput.value = formatDate(startDate);
+    fechaHastaInput.value = formatDate(endDate);
+
+    // Mostrar feedback visual (opcional)
+    console.log(`Rango de fechas actualizado (Listado): ${range} (${formatDate(startDate)} - ${formatDate(endDate)})`);
+}
 
 // Debug info
 console.log('Reports page loaded successfully');

@@ -249,9 +249,9 @@ def exportar_facturas_excel():
             'num_format': 'dd/mm/yyyy'
         })
         
-        # Headers según el formato de la imagen
+        # Headers según el formato de la imagen (sin Serie ya que no existe)
         headers = [
-            'Fecha', 'Serie', 'Factura', 'NIF', 'Nombre', 'Base', 
+            'Fecha', 'Factura', 'NIF', 'Nombre', 'Base', 
             '% IVA', 'Importe IVA', '% IRPF', 'Importe IRPF', 
             'Total', 'Cod.Concepto', 'Concepto', 'Local'
         ]
@@ -260,16 +260,16 @@ def exportar_facturas_excel():
         for col, header in enumerate(headers):
             worksheet.write(0, col, header, header_format)
         
-        # Configurar ancho de columnas
-        column_widths = [12, 8, 12, 15, 30, 12, 8, 12, 8, 12, 12, 12, 25, 20]
+        # Configurar ancho de columnas (sin Serie)
+        column_widths = [12, 15, 15, 30, 12, 8, 12, 8, 12, 12, 12, 25, 20]
         for col, width in enumerate(column_widths):
             worksheet.set_column(col, col, width)
         
         # Escribir datos
         for row, factura in enumerate(facturas, 1):
-            # Obtener datos de contrato de forma segura
+            # Obtener datos de contrato y propiedad de forma segura
             contrato_numero = 'N/A'
-            propiedad_direccion = 'N/A'
+            propiedad_numero_local = ''
             inquilino_nombre = 'N/A'
             inquilino_nif = 'N/A'
             
@@ -279,7 +279,7 @@ def exportar_facturas_excel():
                     if contrato:
                         contrato_numero = contrato.numero_contrato or 'N/A'
                         if contrato.propiedad_ref:
-                            propiedad_direccion = contrato.propiedad_ref.direccion or 'N/A'
+                            propiedad_numero_local = contrato.propiedad_ref.numero_local or ''
                         if contrato.inquilino_ref:
                             inquilino_nombre = contrato.inquilino_ref.nombre or 'N/A'
                             inquilino_nif = contrato.inquilino_ref.nif or 'N/A'
@@ -296,53 +296,24 @@ def exportar_facturas_excel():
             porc_iva = Dec('21') if importe_iva > 0 else Dec('0')
             porc_irpf = Dec('19') if importe_irpf > 0 else Dec('0')
             
-            # Escribir fila de datos
+            # Obtener número de factura para mostrar (como en PDF)
+            numero_factura_mostrar = factura.numero_factura_mostrado_al_cliente
+            
+            # Escribir fila de datos con los datos corregidos
             worksheet.write(row, 0, factura.fecha_emision, date_format)
-            worksheet.write(row, 1, factura.serie or '', data_format)
-            worksheet.write(row, 2, factura.numero_factura or '', data_format)
-            worksheet.write(row, 3, inquilino_nif, data_format)
-            worksheet.write(row, 4, inquilino_nombre, data_format)
-            worksheet.write(row, 5, float(base_imponible), number_format)
-            worksheet.write(row, 6, f"{porc_iva}%", percent_format)
-            worksheet.write(row, 7, float(importe_iva), number_format)
-            worksheet.write(row, 8, f"{porc_irpf}%" if importe_irpf > 0 else "", percent_format)
-            worksheet.write(row, 9, float(importe_irpf), number_format)
-            worksheet.write(row, 10, float(total), number_format)
-            worksheet.write(row, 11, "ALQ", data_format)
-            worksheet.write(row, 12, factura.concepto or "Alquiler", data_format)
-            worksheet.write(row, 13, propiedad_direccion, data_format)
-        
-        # Agregar fila de totales
-        if facturas:
-            row = len(facturas) + 1
-            total_base = sum(Dec(str(f.subtotal or 0)) for f in facturas)
-            total_iva = sum(Dec(str(f.iva or 0)) for f in facturas)
-            total_irpf = sum(Dec(str(f.irpf or 0)) for f in facturas)
-            total_general = sum(Dec(str(f.total or 0)) for f in facturas)
-            
-            # Formato para totales
-            total_format = workbook.add_format({
-                'bold': True,
-                'bg_color': '#D9E1F2',
-                'border': 1,
-                'align': 'right',
-                'valign': 'vcenter',
-                'num_format': '#,##0.00'
-            })
-            
-            total_label_format = workbook.add_format({
-                'bold': True,
-                'bg_color': '#D9E1F2',
-                'border': 1,
-                'align': 'center',
-                'valign': 'vcenter'
-            })
-            
-            worksheet.write(row, 4, 'TOTALES:', total_label_format)
-            worksheet.write(row, 5, float(total_base), total_format)
-            worksheet.write(row, 7, float(total_iva), total_format)
-            worksheet.write(row, 9, float(total_irpf), total_format)
-            worksheet.write(row, 10, float(total_general), total_format)
+            worksheet.write(row, 1, numero_factura_mostrar, data_format)
+            worksheet.write(row, 2, inquilino_nif, data_format)
+            worksheet.write(row, 3, inquilino_nombre, data_format)
+            worksheet.write(row, 4, float(base_imponible), number_format)
+            worksheet.write(row, 5, f"{porc_iva}%", percent_format)
+            worksheet.write(row, 6, float(importe_iva), number_format)
+            worksheet.write(row, 7, f"{porc_irpf}%" if importe_irpf > 0 else "", percent_format)
+            worksheet.write(row, 8, float(importe_irpf), number_format)
+            worksheet.write(row, 9, float(total), number_format)
+            worksheet.write(row, 10, "3", data_format)  # Código concepto "3"
+            worksheet.write(row, 11, f"N/FRA {numero_factura_mostrar}", data_format)  # Concepto con formato
+            worksheet.write(row, 12, propiedad_numero_local, data_format)  # Número de local
+
         
         workbook.close()
         output.seek(0)
