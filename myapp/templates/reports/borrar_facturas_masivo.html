@@ -206,14 +206,37 @@
 
 
     function updateContractFilterOptions() {
+        console.log('🔄 updateContractFilterOptions() - EJECUTÁNDOSE');
+        
         const ownerSelect = document.getElementById('propietario_id');
         const contractSelect = document.getElementById('contrato_id');
         
+        console.log('🔍 Elementos encontrados:', {
+            ownerSelect: !!ownerSelect,
+            contractSelect: !!contractSelect,
+            allContractsDataForFilter: allContractsDataForFilter ? allContractsDataForFilter.length : 'undefined'
+        });
+        
         if (!ownerSelect || !contractSelect) {
-            console.warn("Selects de propietario o contrato no encontrados en updateContractFilterOptions.");
+            console.error("❌ Selects de propietario o contrato no encontrados en updateContractFilterOptions.");
             return;
         }
-        const selectedOwnerId = ownerSelect.value;
+        
+        // Obtener el ID del propietario seleccionado (considerando propietario preseleccionado)
+        let selectedOwnerId = ownerSelect.value;
+        
+        console.log('🏷️ Owner inicial:', { value: ownerSelect.value, disabled: ownerSelect.disabled });
+        
+        // Si el select está deshabilitado (propietario preseleccionado), usar el valor del input hidden
+        if (ownerSelect.disabled) {
+            const hiddenInput = document.querySelector('input[name="propietario_id"][type="hidden"]');
+            if (hiddenInput) {
+                selectedOwnerId = hiddenInput.value;
+                console.log('🔧 Usando hiddenInput:', hiddenInput.value);
+            }
+        }
+        
+        console.log('🎯 selectedOwnerId final:', selectedOwnerId);
         const currentSelectedContractId = contractSelect.value;
 
         contractSelect.innerHTML = '';
@@ -228,12 +251,28 @@
         }
         contractSelect.appendChild(defaultOption);
         
-        const contractsToShow = allContractsDataForFilter.filter(c => {
-            if (selectedOwnerId === 'all') {
-                return isAdmin ? true : (c.propietario_id && {{ current_user.propietarios_asignados | map(attribute='id') | list | tojson }}.includes(c.propietario_id) );
-            }
-            return c.propietario_id == selectedOwnerId;
+        let contractsToShow = [];
+        
+        if (selectedOwnerId === 'all') {
+            // Para admin: todos los contratos, para gestor: solo los asignados
+            const assignedOwnerIds = {{ current_user.propietarios_asignados | map(attribute='id') | list | tojson }};
+            contractsToShow = allContractsDataForFilter.filter(c => {
+                return isAdmin || (c.propietario_id && assignedOwnerIds.includes(c.propietario_id));
+            });
+        } else {
+            // Filtrar por propietario específico
+            contractsToShow = allContractsDataForFilter.filter(c => {
+                return String(c.propietario_id) === String(selectedOwnerId);
+            });
+        }
+        
+        console.log('📊 Resultado filtrado:', {
+            selectedOwnerId: selectedOwnerId,
+            contractsToShow: contractsToShow.length,
+            primeros2: contractsToShow.slice(0, 2).map(c => ({id: c.id, numero: c.numero, propietario_id: c.propietario_id}))
         });
+
+
 
         if (contractsToShow.length === 0 && selectedOwnerId !== 'all') {
             const noContractsOption = document.createElement('option');
@@ -242,12 +281,22 @@
             noContractsOption.disabled = true;
             contractSelect.appendChild(noContractsOption);
         } else {
-            contractsToShow.forEach(c => {
+            // Agregar contratos específicos
+            console.log(`📝 INICIANDO agregado de ${contractsToShow.length} contratos al DOM...`);
+            
+            contractsToShow.forEach((c, index) => {
                 const option = document.createElement('option');
                 option.value = c.id;
                 option.textContent = `${c.numero} (${c.direccion_propiedad || 'S/D'}) - Inq: ${c.nombre_inquilino || 'S/I'}`;
                 contractSelect.appendChild(option);
+                
+                if (index < 2) {
+                    console.log(`   ✓ [${index}] ${option.textContent} (value: ${option.value})`);
+                }
             });
+            
+            console.log(`✅ COMPLETADO: Agregados ${contractsToShow.length} contratos al DOM`);
+            console.log(`🔍 contractSelect.children.length después:`, contractSelect.children.length);
         }
         
         if (contractSelect.querySelector(`option[value="${currentSelectedContractId}"]`)) {
@@ -340,10 +389,30 @@
 
     // Inicialización
     document.addEventListener('DOMContentLoaded', function() {
-        updateContractFilterOptions();
-        document.getElementById('propietario_id').addEventListener('change', updateContractFilterOptions);
+        console.log('🚀 BORRADO MASIVO - Inicializando...');
+        
+        // Configurar valores por defecto
         document.getElementById('mes_desde').value = '1';
         document.getElementById('mes_hasta').value = '12';
+        
+        // Configurar event listener para cambios de propietario
+        document.getElementById('propietario_id').addEventListener('change', updateContractFilterOptions);
+        
+        // Verificar si hay datos disponibles
+        console.log('📊 Datos disponibles:', {
+            contratos: allContractsDataForFilter ? allContractsDataForFilter.length : 'undefined',
+            isAdmin: isAdmin
+        });
+        
+        // Cargar contratos inmediatamente para propietario preseleccionado
+        console.log('🔄 Cargando contratos...');
+        updateContractFilterOptions();
+        
+        // También cargar con delay como backup
+        setTimeout(function() {
+            console.log('🔄 Backup: Cargando contratos...');
+            updateContractFilterOptions();
+        }, 500);
     });
 
 </script>

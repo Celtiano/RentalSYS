@@ -48,11 +48,21 @@
                     <input type="hidden" name="propietario_id" value="{{ propietario.id }}">
                     <input type="hidden" name="fecha_desde" value="{{ fecha_desde.strftime('%Y-%m-%d') }}">
                     <input type="hidden" name="fecha_hasta" value="{{ fecha_hasta.strftime('%Y-%m-%d') }}">
+                    {% if contrato_seleccionado_id %}
+                    <input type="hidden" name="contrato_ids" value="{{ contrato_seleccionado_id }}">
+                    {% else %}
+                    <input type="hidden" name="contrato_ids" value="all_contracts_of_owner">
+                    {% endif %}
                     
                     <button type="submit" 
                             class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors">
                         <i class="fas fa-file-pdf mr-2"></i>
                         Exportar PDF
+                        {% if contrato_seleccionado_id %}
+                        <span class="text-xs">(Contrato específico)</span>
+                        {% else %}
+                        <span class="text-xs">(Todos los contratos)</span>
+                        {% endif %}
                     </button>
                 </form>
                 

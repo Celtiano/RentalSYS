@@ -1,6 +1,7 @@
 # myapp/routes/reports.py
 
 import os
+import json
 import tempfile
 from datetime import datetime, date
 from decimal import Decimal
@@ -98,15 +99,43 @@ def index():
         
         # Obtener propietarios disponibles
         propietarios_disponibles = []
+        contratos_disponibles = []
         try:
             if current_user.role == 'admin':
                 propietarios_disponibles = Propietario.query.order_by(Propietario.nombre).all()
+                # Cargar todos los contratos para admin
+                contratos_disponibles = Contrato.query.options(
+                    joinedload(Contrato.propiedad_ref).joinedload(Propiedad.propietario_ref),
+                    joinedload(Contrato.inquilino_ref)
+                ).order_by(Contrato.numero_contrato).all()
             else:
                 propietarios_disponibles = list(current_user.propietarios_asignados)
+                # Cargar contratos solo de propietarios asignados
+                assigned_owner_ids = [p.id for p in propietarios_disponibles]
+                if assigned_owner_ids:
+                    contratos_disponibles = Contrato.query.join(Propiedad)\
+                        .filter(Propiedad.propietario_id.in_(assigned_owner_ids))\
+                        .options(
+                            joinedload(Contrato.propiedad_ref).joinedload(Propiedad.propietario_ref),
+                            joinedload(Contrato.inquilino_ref)
+                        )\
+                        .order_by(Contrato.numero_contrato).all()
         except Exception as e:
-            current_app.logger.warning(f"Error obteniendo propietarios: {e}")
+            current_app.logger.warning(f"Error obteniendo propietarios/contratos: {e}")
             propietarios_disponibles = []
+            contratos_disponibles = []
         
+        # Convertir contratos a formato JSON para JavaScript
+        contratos_json = []
+        for contrato in contratos_disponibles:
+            contratos_json.append({
+                "id": contrato.id,
+                "numero": contrato.numero_contrato,
+                "propietario_id": contrato.propiedad_ref.propietario_id if contrato.propiedad_ref else None,
+                "direccion_propiedad": contrato.propiedad_ref.direccion if contrato.propiedad_ref else "N/A",
+                "nombre_inquilino": contrato.inquilino_ref.nombre if contrato.inquilino_ref else "N/A"
+            })
+
         # Extraer información del contexto de forma segura
         active_owner = None
         preselected_owner_id = None
@@ -115,6 +144,14 @@ def index():
             active_owner = active_owner_context.get('active_owner')
             preselected_owner_id = active_owner_context.get('active_owner_id')
         
+        # FILTRAR CONTRATOS por propietario activo si existe
+        if preselected_owner_id:
+            contratos_json = [
+                c for c in contratos_json 
+                if c.get('propietario_id') == preselected_owner_id
+            ]
+            current_app.logger.info(f"Filtrados {len(contratos_json)} contratos para propietario activo {preselected_owner_id}")
+        
         current_app.logger.info(f"Reports index: Usuario={current_user.username}, Propietario activo={active_owner.nombre if active_owner else 'Ninguno'}")
         
         return render_template(
@@ -122,6 +159,7 @@ def index():
             title="Informes y Exportaciones",
             csrf_form=csrf_form,
             propietarios=propietarios_disponibles,
+            contratos_json=json.dumps(contratos_json),
             active_owner=active_owner,
             preselected_owner_id=preselected_owner_id
         )
@@ -138,6 +176,7 @@ def index():
             title="Informes y Exportaciones",
             csrf_form=csrf_form,
             propietarios=[],
+            contratos_json=json.dumps([]),
             active_owner=None,
             preselected_owner_id=None
         )
@@ -350,8 +389,14 @@ def listado_facturacion():
         propietario_id = request.form.get('propietario_id')
         fecha_desde = request.form.get('fecha_desde')  
         fecha_hasta = request.form.get('fecha_hasta')
+        contrato_id = request.form.get('contrato_ids')  # CORREGIDO: el frontend envía 'contrato_ids'
         
-        current_app.logger.info(f"Params: prop={propietario_id}, desde={fecha_desde}, hasta={fecha_hasta}")
+        current_app.logger.info(f"🔍 LISTADO FACTURACIÓN - Params recibidos:")
+        current_app.logger.info(f"  - propietario_id: {propietario_id}")
+        current_app.logger.info(f"  - fecha_desde: {fecha_desde}")
+        current_app.logger.info(f"  - fecha_hasta: {fecha_hasta}")
+        current_app.logger.info(f"  - contrato_id: {contrato_id}")
+        current_app.logger.info(f"  - TODOS los form data: {dict(request.form)}")
         
         # Validación básica
         if not propietario_id:
@@ -383,10 +428,42 @@ def listado_facturacion():
         # Consulta ULTRA-SIMPLE - Solo facturas por propiedad
         current_app.logger.info(f"🔍 CONSULTA SQL con fechas: {fecha_desde_dt} <= fecha_emision <= {fecha_hasta_dt}")
         
-        # Primero verificar qué propiedades tiene el propietario
-        propiedades_ids = db.session.query(Propiedad.id).filter(Propiedad.propietario_id == propietario_id).all()
-        propiedades_ids = [p[0] for p in propiedades_ids]
-        current_app.logger.info(f"🏠 Propiedades del propietario: {propiedades_ids}")
+        # Verificar si se filtró por contrato específico
+        filtrar_por_contrato = contrato_id and contrato_id != "all_contracts_of_owner"
+        contrato_id_int = None  # Inicializar variable
+        
+        if contrato_id == "all_contracts_of_owner":
+            current_app.logger.info(f"📋 TODOS los contratos del propietario seleccionados")
+        elif contrato_id:
+            current_app.logger.info(f"🎯 Contrato específico seleccionado: {contrato_id}")
+        else:
+            current_app.logger.info(f"⚠️ Sin parámetro de contrato")
+        
+        if filtrar_por_contrato:
+            # Filtrar por contrato específico
+            try:
+                contrato_id_int = int(contrato_id)
+                current_app.logger.info(f"🎯 Filtrando por contrato específico: {contrato_id_int}")
+                
+                # Obtener propiedad del contrato específico
+                contrato = db.session.get(Contrato, contrato_id_int)
+                if not contrato:
+                    flash("Contrato no encontrado", "error")
+                    return redirect(url_for('reports_bp.index'))
+                
+                propiedades_ids = [contrato.propiedad_id]
+                current_app.logger.info(f"🏠 Propiedad del contrato: {contrato.propiedad_id}")
+                
+            except (ValueError, TypeError) as e:
+                current_app.logger.error(f"Error procesando contrato_id: {e}")
+                flash("Error en ID de contrato", "error")
+                return redirect(url_for('reports_bp.index'))
+        else:
+            # Filtrar por todas las propiedades del propietario
+            current_app.logger.info(f"📋 Procesando TODOS los contratos del propietario")
+            propiedades_ids = db.session.query(Propiedad.id).filter(Propiedad.propietario_id == propietario_id).all()
+            propiedades_ids = [p[0] for p in propiedades_ids]
+            current_app.logger.info(f"🏠 Propiedades del propietario: {propiedades_ids}")
         
         # Consulta con debug detallado
         query = db.session.query(Factura)\
@@ -395,24 +472,49 @@ def listado_facturacion():
             .filter(Factura.propiedad_id.in_(propiedades_ids))\
             .order_by(Factura.fecha_emision.asc())
             
+        # AGREGAR FILTRO POR CONTRATO SI ES ESPECÍFICO
+        if filtrar_por_contrato and contrato_id_int:
+            query = query.filter(Factura.contrato_id == contrato_id_int)
+            current_app.logger.info(f"🎯 Filtro por contrato agregado: contrato_id={contrato_id_int}")
+        else:
+            current_app.logger.info(f"📋 Sin filtro de contrato específico")
+            
         # Debug: mostrar todas las facturas del propietario sin filtro de fecha
-        todas_facturas = db.session.query(Factura)\
+        todas_facturas_query = db.session.query(Factura)\
             .filter(Factura.propiedad_id.in_(propiedades_ids))\
-            .order_by(Factura.fecha_emision.asc())\
-            .all()
+            .order_by(Factura.fecha_emision.asc())
+            
+        # Aplicar filtro de contrato también en debug si aplica
+        if filtrar_por_contrato and contrato_id_int:
+            todas_facturas_query = todas_facturas_query.filter(Factura.contrato_id == contrato_id_int)
+            
+        todas_facturas = todas_facturas_query.all()
             
         current_app.logger.info(f"📊 Total facturas sin filtro fecha: {len(todas_facturas)}")
-        for f in todas_facturas[:5]:  # Solo las primeras 5 para no spam
-            current_app.logger.info(f"   Factura {f.numero_factura}: {f.fecha_emision} (tipo: {type(f.fecha_emision)})")
         
         facturas = query.all()
-        current_app.logger.info(f"📊 Facturas CON filtro fecha: {len(facturas)}")
+        current_app.logger.info(f"📊 Facturas CON filtro fecha{'y contrato' if filtrar_por_contrato else ''}: {len(facturas)}")
+        
+        if filtrar_por_contrato and contrato_id_int:
+            current_app.logger.info(f"✅ FILTRO POR CONTRATO APLICADO: Solo facturas del contrato {contrato_id_int}")
+            # Log específico de facturas encontradas
+            current_app.logger.info(f"📋 Facturas del contrato {contrato_id_int}: {[f.numero_factura for f in facturas]}")
+        else:
+            current_app.logger.info(f"📋 SIN FILTRO DE CONTRATO: Todas las facturas del propietario")
+            
+        # VALIDACIÓN ADICIONAL: Verificar que todas las facturas sean del contrato correcto
+        if filtrar_por_contrato and contrato_id_int and facturas:
+            facturas_incorrectas = [f for f in facturas if f.contrato_id != contrato_id_int]
+            if facturas_incorrectas:
+                current_app.logger.error(f"❌ ERROR: Encontradas {len(facturas_incorrectas)} facturas de contratos incorrectos!")
+                for f in facturas_incorrectas:
+                    current_app.logger.error(f"   Factura {f.numero_factura} pertenece al contrato {f.contrato_id}, no {contrato_id_int}")
+            else:
+                current_app.logger.info(f"✅ VALIDACIÓN OK: Todas las facturas pertenecen al contrato {contrato_id_int}")
         
         # Si no hay facturas, mostrar debug adicional
         if not facturas and todas_facturas:
-            current_app.logger.warning(f"⚠️ Hay {len(todas_facturas)} facturas sin filtro, pero 0 con filtro")
-            current_app.logger.warning(f"   Fechas buscar: {fecha_desde_dt} a {fecha_hasta_dt}")
-            current_app.logger.warning(f"   Fechas en BD: {[f.fecha_emision for f in todas_facturas[:3]]}")
+            current_app.logger.warning(f"⚠️ Hay {len(todas_facturas)} facturas sin filtro fecha, pero 0 con filtro de fecha")
             
         current_app.logger.info(f"Facturas encontradas: {len(facturas)}")
         
@@ -474,10 +576,15 @@ def listado_facturacion():
             'totales_generales': totales_generales,
             'fecha_desde': fecha_desde_dt,
             'fecha_hasta': fecha_hasta_dt,
-            'total_facturas': len(facturas)
+            'total_facturas': len(facturas),
+            'contrato_seleccionado_id': contrato_id_int if filtrar_por_contrato else None  # AGREGADO
         }
         
         current_app.logger.info(f"Datos OK - Facturas: {len(facturas)}, Total: {totales_generales['total']}")
+        if filtrar_por_contrato and contrato_id_int:
+            current_app.logger.info(f"✅ Template: contrato_seleccionado_id = {contrato_id_int} (contrato específico)")
+        else:
+            current_app.logger.info(f"✅ Template: contrato_seleccionado_id = None (todos los contratos)")
         
         # Renderizar template simple
         return render_template(
@@ -518,6 +625,14 @@ def listado_facturacion_pdf():
         propietario_id = request.form.get('propietario_id')
         fecha_desde = request.form.get('fecha_desde')  
         fecha_hasta = request.form.get('fecha_hasta')
+        contrato_id = request.form.get('contrato_ids')  # AGREGADO: parámetro de contrato
+        
+        current_app.logger.info(f"🔍 PDF LISTADO - Params: prop={propietario_id}, desde={fecha_desde}, hasta={fecha_hasta}, contrato={contrato_id}")
+        
+        if contrato_id:
+            current_app.logger.info(f"✅ PDF: Parámetro contrato_ids recibido correctamente: {contrato_id}")
+        else:
+            current_app.logger.warning(f"⚠️ PDF: Parámetro contrato_ids es None - se procesarán todos los contratos")
         
         # Validaciones (igual que función HTML)
         if not propietario_id or not fecha_desde or not fecha_hasta:
@@ -535,16 +650,60 @@ def listado_facturacion_pdf():
             flash("Propietario no encontrado", "error")
             return redirect(url_for('reports_bp.index'))
         
-        # Misma consulta que función HTML
-        propiedades_ids = db.session.query(Propiedad.id).filter(Propiedad.propietario_id == propietario_id).all()
-        propiedades_ids = [p[0] for p in propiedades_ids]
+        # APLICAR MISMO FILTRO QUE FUNCIÓN HTML
+        filtrar_por_contrato = contrato_id and contrato_id != "all_contracts_of_owner"
+        contrato_id_int = None
         
-        facturas = db.session.query(Factura)\
+        if contrato_id == "all_contracts_of_owner":
+            current_app.logger.info(f"📋 PDF: TODOS los contratos del propietario seleccionados")
+        elif contrato_id:
+            current_app.logger.info(f"🎯 PDF: Contrato específico seleccionado: {contrato_id}")
+        else:
+            current_app.logger.info(f"⚠️ PDF: Sin parámetro de contrato")
+        
+        if filtrar_por_contrato:
+            try:
+                contrato_id_int = int(contrato_id)
+                current_app.logger.info(f"🎯 PDF: Filtrando por contrato específico: {contrato_id_int}")
+                
+                # Obtener propiedad del contrato específico
+                contrato = db.session.get(Contrato, contrato_id_int)
+                if not contrato:
+                    flash("Contrato no encontrado", "error")
+                    return redirect(url_for('reports_bp.index'))
+                
+                propiedades_ids = [contrato.propiedad_id]
+                current_app.logger.info(f"🏠 PDF: Propiedad del contrato: {contrato.propiedad_id}")
+                
+            except (ValueError, TypeError) as e:
+                current_app.logger.error(f"Error procesando contrato_id en PDF: {e}")
+                flash("Error en ID de contrato", "error")
+                return redirect(url_for('reports_bp.index'))
+        else:
+            current_app.logger.info(f"📋 PDF: Procesando TODOS los contratos del propietario")
+            propiedades_ids = db.session.query(Propiedad.id).filter(Propiedad.propietario_id == propietario_id).all()
+            propiedades_ids = [p[0] for p in propiedades_ids]
+
+        # Consulta con filtro de contrato si aplica
+        query = db.session.query(Factura)\
             .filter(Factura.fecha_emision >= fecha_desde_dt)\
             .filter(Factura.fecha_emision <= fecha_hasta_dt)\
             .filter(Factura.propiedad_id.in_(propiedades_ids))\
-            .order_by(Factura.fecha_emision.asc())\
-            .all()
+            .order_by(Factura.fecha_emision.asc())
+            
+        # AGREGAR FILTRO POR CONTRATO SI ES ESPECÍFICO
+        if filtrar_por_contrato and contrato_id_int:
+            query = query.filter(Factura.contrato_id == contrato_id_int)
+            current_app.logger.info(f"🎯 PDF: Filtro por contrato agregado: contrato_id={contrato_id_int}")
+            
+        facturas = query.all()
+        current_app.logger.info(f"📊 PDF: Facturas encontradas: {len(facturas)}")
+        
+        if filtrar_por_contrato and contrato_id_int:
+            current_app.logger.info(f"✅ PDF: FILTRO APLICADO - Solo facturas del contrato {contrato_id_int}")
+            current_app.logger.info(f"📋 PDF: Facturas: {[f.numero_factura for f in facturas]}")
+        else:
+            current_app.logger.info(f"📋 PDF: SIN FILTRO DE CONTRATO - Todas las facturas del propietario")
             
         if not facturas:
             flash("No hay facturas para generar PDF", "warning")

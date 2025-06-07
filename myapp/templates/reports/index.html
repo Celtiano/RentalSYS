@@ -276,8 +276,8 @@
                                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                         Contratos
                                     </label>
-                                    <select name="contrato_ids" class="form-input w-full text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200">
-                                        <option value="todos" selected>Todos los contratos</option>
+                                    <select id="contrato_ids_listado" name="contrato_ids" class="form-input w-full text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200">
+                                        <option value="all_contracts_of_owner" selected>Todos los contratos</option>
                                     </select>
                                     <p class="text-xs text-gray-500 mt-1">Por defecto se incluyen todos los contratos</p>
                                 </div>
@@ -451,10 +451,67 @@ function setDateRangeListado(range) {
     console.log(`Rango de fechas actualizado (Listado): ${range} (${formatDate(startDate)} - ${formatDate(endDate)})`);
 }
 
+// Datos de contratos desde el backend
+const allContractsData = {{ contratos_json | safe }};
+const hasActiveOwner = {% if preselected_owner_id %}true{% else %}false{% endif %};
+
+// Función para cargar contratos en el modal de listado de facturación
+function loadContractsForListado() {
+    const contractSelect = document.getElementById('contrato_ids_listado');
+    
+    if (!contractSelect) {
+        console.warn("Select de contratos no encontrado para listado de facturación");
+        return;
+    }
+    
+    // Limpiar opciones existentes
+    contractSelect.innerHTML = '';
+    
+    // Agregar opción por defecto
+    const defaultOption = document.createElement('option');
+    defaultOption.value = 'all_contracts_of_owner';
+    defaultOption.textContent = hasActiveOwner ? 'Todos los del Propietario' : 'Todos los contratos';
+    defaultOption.selected = true;
+    contractSelect.appendChild(defaultOption);
+    
+    // Agregar contratos específicos
+    if (allContractsData && allContractsData.length > 0) {
+        allContractsData.forEach(contrato => {
+            const option = document.createElement('option');
+            option.value = contrato.id;
+            option.textContent = `${contrato.numero} (${contrato.direccion_propiedad || 'S/D'}) - Inq: ${contrato.nombre_inquilino || 'S/I'}`;
+            contractSelect.appendChild(option);
+        });
+        
+        console.log(`Cargados ${allContractsData.length} contratos en listado de facturación`);
+    } else {
+        // Si no hay contratos específicos, agregar mensaje
+        const noContractsOption = document.createElement('option');
+        noContractsOption.value = "";
+        noContractsOption.textContent = "(Sin contratos disponibles)";
+        noContractsOption.disabled = true;
+        contractSelect.appendChild(noContractsOption);
+    }
+}
+
+// Modificar función openModal para cargar contratos cuando se abre el modal de listado
+const originalOpenModal = openModal;
+window.openModal = function(modalId) {
+    originalOpenModal(modalId);
+    
+    // Si es el modal de listado de facturación, cargar contratos
+    if (modalId === 'listadoFacturacionModal') {
+        setTimeout(() => {
+            loadContractsForListado();
+        }, 100);
+    }
+};
+
 // Debug info
 console.log('Reports page loaded successfully');
 {% if active_owner %}
 console.log('Active owner: {{ active_owner.nombre }} (ID: {{ active_owner.id }})');
 {% endif %}
+console.log('Contratos disponibles:', allContractsData ? allContractsData.length : 0);
 </script>
 {% endblock %}

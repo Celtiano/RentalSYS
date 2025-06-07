@@ -1017,8 +1017,16 @@ def borrar_facturas_masivo():
     # Para GET request - Incluir propietario activo si existe
     active_owner_context = get_active_owner_context()
     preselected_owner_id = None
+    
     if active_owner_context and active_owner_context.get('active_owner'):
         preselected_owner_id = active_owner_context['active_owner'].id
+        
+        # FILTRAR CONTRATOS por propietario activo si existe
+        contratos_para_select_json = [
+            c for c in contratos_para_select_json 
+            if c.get('propietario_id') == preselected_owner_id
+        ]
+        current_app.logger.info(f"Borrado masivo: {len(contratos_para_select_json)} contratos para propietario {preselected_owner_id}")
     
     return render_template('reports/borrar_facturas_masivo.html',
                            title="Borrado Masivo de Facturas",
@@ -1851,4 +1859,176 @@ def send_invoice_email(id):
         flash(f"Error crítico al enviar la factura ID {id}. Revisa la configuración de email y los logs.", 'danger')
 
     # Redirigir siempre a la lista, independientemente del resultado del envío
-    return redirect(url_for('facturas_bp.listar_facturas'))                            
+    return redirect(url_for('facturas_bp.listar_facturas'))
+
+
+# DEBUG TEMPORAL - BORRADO MASIVO
+@facturas_bp.route('/debug-borrado-masivo')
+@login_required 
+@role_required(['admin', 'gestor'])
+def debug_borrado_masivo():
+    from flask import render_template_string
+    
+    try:
+        # Obtener contexto de propietario activo PRIMERO
+        active_owner_context = get_active_owner_context()
+        preselected_owner_id = None
+        
+        if active_owner_context and active_owner_context.get('active_owner'):
+            preselected_owner_id = active_owner_context['active_owner'].id
+        
+        # Obtener contratos con filtro de propietario si existe
+        query_contratos = db.session.query(Contrato)\
+            .options(joinedload(Contrato.propiedad), joinedload(Contrato.inquilino))
+            
+        if preselected_owner_id:
+            # Filtrar por propietario activo
+            query_contratos = query_contratos.join(Contrato.propiedad)\
+                .filter(Propiedad.propietario_id == preselected_owner_id)
+                
+        contratos_para_select = query_contratos.all()
+        contratos_para_select_json = []
+        
+        for contrato in contratos_para_select:
+            contrato_data = {
+                'id': contrato.id,
+                'numero': contrato.numero_contrato,
+                'propietario_id': contrato.propiedad.propietario_id if contrato.propiedad else None,
+                'direccion_propiedad': contrato.propiedad.direccion if contrato.propiedad else None,
+                'nombre_inquilino': contrato.inquilino.nombre if contrato.inquilino else None
+            }
+            contratos_para_select_json.append(contrato_data)
+        
+        html_template = '''
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Borrado Masivo</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        pre { background: #f5f5f5; padding: 10px; border-radius: 4px; white-space: pre-wrap; }
+        .success { background: #d4edda; color: #155724; padding: 10px; margin: 10px 0; border-radius: 4px; }
+        .error { background: #f8d7da; color: #721c24; padding: 10px; margin: 10px 0; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Debug del Borrado Masivo</h1>
+    <p><a href="/facturas/borrar-masivo">← Volver al Borrado Masivo</a></p>
+    
+    <div>
+        <h2>1. ✅ Datos del backend:</h2>
+        <pre id="backend-data"></pre>
+    </div>
+    
+    <div>
+        <h2>2. 🔧 Elementos DOM:</h2>
+        <pre id="dom-elements"></pre>
+    </div>
+    
+    <div>
+        <h2>3. 🧪 Test manual:</h2>
+        <button onclick="testFunction()" style="padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">
+            🚀 Ejecutar Simulación
+        </button>
+        <div id="test-status"></div>
+        <pre id="test-result"></pre>
+    </div>
+    
+    <!-- Simular elementos del form original -->
+    <div style="display: none;">
+        <select id="propietario_id"''' + (' disabled' if preselected_owner_id else '') + '''>
+            <option value="''' + str(preselected_owner_id or '') + '''">Test</option>
+        </select>
+        <select id="contrato_id">
+            <option value="">Seleccione...</option>
+        </select>''' + (f'<input type="hidden" name="propietario_id" value="{preselected_owner_id}">' if preselected_owner_id else '') + '''
+    </div>
+
+    <script>
+        const allContractsDataForFilter = ''' + json.dumps(contratos_para_select_json) + ''';
+        const isAdmin = ''' + json.dumps(current_user.role == 'admin') + ''';
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('backend-data').textContent = JSON.stringify({
+                allContractsDataForFilter: allContractsDataForFilter,
+                isAdmin: isAdmin,
+                contractsCount: allContractsDataForFilter ? allContractsDataForFilter.length : 'undefined',
+                preselectedOwnerId: "''' + str(preselected_owner_id or 'null') + '''",
+                firstContract: allContractsDataForFilter && allContractsDataForFilter[0] ? allContractsDataForFilter[0] : 'none'
+            }, null, 2);
+            
+            const ownerSelect = document.getElementById('propietario_id');
+            const contractSelect = document.getElementById('contrato_id');
+            
+            document.getElementById('dom-elements').textContent = JSON.stringify({
+                ownerSelect: !!ownerSelect,
+                contractSelect: !!contractSelect,
+                ownerValue: ownerSelect ? ownerSelect.value : 'not found',
+                ownerDisabled: ownerSelect ? ownerSelect.disabled : 'not found',
+                contractOptions: contractSelect ? contractSelect.children.length : 'not found'
+            }, null, 2);
+        });
+        
+        function testFunction() {
+            document.getElementById('test-status').innerHTML = '<div style="background: #fff3cd; color: #856404; padding: 10px; margin: 10px 0; border-radius: 4px;">🔄 Ejecutando test...</div>';
+            
+            const ownerSelect = document.getElementById('propietario_id');
+            const contractSelect = document.getElementById('contrato_id');
+            
+            if (!ownerSelect || !contractSelect) {
+                document.getElementById('test-status').innerHTML = '<div class="error">❌ ERROR: Elementos no encontrados</div>';
+                return;
+            }
+            
+            let selectedOwnerId = ownerSelect.value;
+            
+            if (ownerSelect.disabled) {
+                const hiddenInput = document.querySelector('input[name="propietario_id"][type="hidden"]');
+                if (hiddenInput) {
+                    selectedOwnerId = hiddenInput.value;
+                }
+            }
+            
+            const contractsToShow = allContractsDataForFilter.filter(c => {
+                return String(c.propietario_id) === String(selectedOwnerId);
+            });
+            
+            contractSelect.innerHTML = '';
+            
+            const defaultOption = document.createElement('option');
+            defaultOption.value = 'all_contracts_of_owner';
+            defaultOption.textContent = 'Todos los del Propietario';
+            contractSelect.appendChild(defaultOption);
+            
+            contractsToShow.forEach(c => {
+                const option = document.createElement('option');
+                option.value = c.id;
+                option.textContent = c.numero + ' (' + (c.direccion_propiedad || 'S/D') + ') - Inq: ' + (c.nombre_inquilino || 'S/I');
+                contractSelect.appendChild(option);
+            });
+            
+            const success = contractsToShow.length > 0 && contractSelect.children.length > 1;
+            
+            if (success) {
+                document.getElementById('test-status').innerHTML = '<div class="success">✅ SUCCESS: Contratos agregados correctamente!</div>';
+            } else {
+                document.getElementById('test-status').innerHTML = '<div class="error">❌ FAIL: No se agregaron contratos</div>';
+            }
+            
+            document.getElementById('test-result').textContent = JSON.stringify({
+                selectedOwnerId: selectedOwnerId,
+                contractsToShow: contractsToShow,
+                contractsCount: contractsToShow.length,
+                domOptionsAfter: contractSelect.children.length,
+                success: success
+            }, null, 2);
+        }
+    </script>
+</body>
+</html>
+        '''
+        
+        return html_template
+        
+    except Exception as e:
+        return f"Error en debug: {str(e)}"                            
